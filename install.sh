@@ -6,19 +6,28 @@ nj=$(nproc)
 
 home=$PWD
 
-# python/CONDA
+# CUDA version
+CUDAROOT=/usr/local/cuda
+if [ "$(id -g --name)" == "lium" ]; then
+  CUDAROOT=/opt/cuda/10.2 # LIUM Cluster
+  echo "Using local \$CUDAROOT: $CUDAROOT"
+fi
+
+[ ! -d $CUDAROOT ] && echo "CUDAROOT: '$FILE' does not exist." && exit 1
+
+cuda_version=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
+cuda_version_witout_dot=$(echo $cuda_version | xargs | sed 's/\.//')
+
+# CONDA
 conda_url=https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 conda_url=https://repo.anaconda.com/miniconda/Miniconda3-py38_4.9.2-Linux-x86_64.sh
 
-# PYTORCH version
+# PYTORCH
 torch_version=1.8.2
 torchvision_version=0.9.2
 torchaudio_version=0.8.2
+
 torch_wheels="https://download.pytorch.org/whl/lts/1.8/torch_lts.html"
-
-# CUDA version
-cuda_version=10.2
-
 
 venv_dir=$PWD/venv
 
@@ -35,38 +44,24 @@ if [ ! -f $mark ]; then
   . $venv_dir/bin/activate
 
   echo "Installing conda dependencies"
-  yes | conda install -c conda-forge sox || exit 1
-  yes | conda install -c conda-forge libflac || exit 1
-  yes | conda install -c conda-forge cudatoolkit=$cuda_version || exit 1
+  yes | conda install -c conda-forge sox
+  yes | conda install -c conda-forge libflac
   touch $mark
 fi
 source $venv_dir/bin/activate
-
-exit 0
-
-# CUDA version
-CUDAROOT=/usr/local/cuda
-if [ "$(id -g --name)" == "lium" ]; then
-  CUDAROOT=/opt/cuda/10.2 # LIUM Cluster
-  echo "Using local \$CUDAROOT: $CUDAROOT"
-fi
-_cuda_version=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
-if [[ $cuda_version != $_cuda_version ]]; then
-  echo "CUDA env not properly setup! (installed cuda v$cuda_version != in path cuda v$_cuda_version)"
-  exit 1
-fi
-cuda_version_witout_dot=$(echo $cuda_version | xargs | sed 's/\.//')
 
 export PATH=$CUDAROOT/bin:$PATH
 export LD_LIBRARY_PATH=$CUDAROOT/lib64:$LD_LIBRARY_PATH
 export CFLAGS="-I$CUDAROOT/include $CFLAGS"
 export CUDA_HOME=$CUDAROOT
 export CUDA_PATH=$CUDAROOT
+
 echo "if [ \$(which python) != $venv_dir/bin/python ]; then source $venv_dir/bin/activate; fi; export CUDAROOT=$CUDAROOT; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;" > env.sh
 
 mark=.done-pytorch
 if [ ! -f $mark ]; then
   echo " == Installing pytorch $torch_version for cuda $cuda_version =="
+  # pip3 install torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
   pip3 install torch==$torch_version+cu$cuda_version_witout_dot torchvision==$torchvision_version+cu$cuda_version_witout_dot torchaudio==$torchaudio_version -f $torch_wheels
   cd $home
   touch $mark
