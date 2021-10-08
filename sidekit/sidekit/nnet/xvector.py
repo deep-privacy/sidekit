@@ -46,7 +46,6 @@ from .pooling import AttentivePooling
 from .pooling import GruPooling
 from .preprocessor import MfccFrontEnd
 from .preprocessor import MelSpecFrontEnd
-from .preprocessor import BNFrontEnd
 from .preprocessor import RawPreprocessor
 from .xsets import SideSet
 from .xsets import IdMapSet
@@ -504,40 +503,6 @@ class Xtractor(torch.nn.Module):
             self.stat_pooling_weight_decay = 0.00002
             self.before_speaker_embedding_weight_decay = 0.00002
             self.after_speaker_embedding_weight_decay = 0.0002
-
-        elif model_archi == "bn_halfresnet34":
-            self.preprocessor = BNFrontEnd()
-            self.sequence_network = PreHalfResNet34()
-
-            self.embedding_size = embedding_size
-            #self.embedding_size = 256
-            #self.before_speaker_embedding = torch.nn.Linear(in_features = 5120,
-            #                                                out_features = self.embedding_size)
-
-            ars_bn_dim = 256
-            self.before_speaker_embedding = torch.nn.Sequential(OrderedDict([
-                ("lin_be", torch.nn.Linear(in_features = int((5120/80)*ars_bn_dim), out_features = self.embedding_size, bias=False)),
-                ("bn_be", torch.nn.BatchNorm1d(self.embedding_size))
-                ]))
-
-            self.stat_pooling = AttentivePooling(256, ars_bn_dim, global_context=True)
-
-            self.loss = loss
-            if self.loss == "aam":
-                self.after_speaker_embedding = ArcMarginProduct(self.embedding_size,
-                                                                int(self.speaker_number),
-                                                                s = 30,
-                                                                m = 0.2,
-                                                                easy_margin = False)
-            elif self.loss == 'aps':
-                self.after_speaker_embedding = SoftmaxAngularProto(int(self.speaker_number))
-            self.preprocessor_weight_decay = 0.00002
-            self.sequence_network_weight_decay = 0.00002
-            self.stat_pooling_weight_decay = 0.00002
-            self.before_speaker_embedding_weight_decay = 0.00002
-            self.after_speaker_embedding_weight_decay = 0.000
-
-
 
         elif model_archi == "halfresnet34":
             self.preprocessor = MelSpecFrontEnd(n_fft=1024,

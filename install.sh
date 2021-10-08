@@ -8,15 +8,26 @@ home=$PWD
 
 # CUDA version
 CUDAROOT=/usr/local/cuda
+
+# Define LOCAL CUDA version here:
+
+# LIUM Cluster
 if [ "$(id -g --name)" == "lium" ]; then
-  CUDAROOT=/opt/cuda/10.2 # LIUM Cluster
+  CUDAROOT=/opt/cuda/10.2
   echo "Using local \$CUDAROOT: $CUDAROOT"
 fi
 
-[ ! -d $CUDAROOT ] && echo "CUDAROOT: '$FILE' does not exist." && exit 1
+if [ ! -d $CUDAROOT ]; then
+  echo "CUDAROOT: '$FILE' does not exist."
+  echo "Installing for CPU compute platform!"
+  cuda_version="cpu"
+  sleep 2
+else
+  cuda_version=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
+fi
 
-cuda_version=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
 cuda_version_witout_dot=$(echo $cuda_version | xargs | sed 's/\.//')
+
 
 # CONDA
 conda_url=https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -63,21 +74,6 @@ if [ ! -f $mark ]; then
   echo " == Installing pytorch $torch_version for cuda $cuda_version =="
   # pip3 install torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
   pip3 install torch==$torch_version+cu$cuda_version_witout_dot torchvision==$torchvision_version+cu$cuda_version_witout_dot torchaudio==$torchaudio_version -f $torch_wheels
-  cd $home
-  touch $mark
-fi
-
-mark=.done-python-requirements
-if [ ! -f $mark ]; then
-  echo " == Installing python libraries =="
-
-  # sidekit additional req
-  pip3 install matplotlib==3.4.3
-  pip3 install SoundFile==0.10.3.post1
-  pip3 install PyYAML==5.4.1
-  pip3 install h5py==3.2.1
-  pip3 install ipython==7.27.0
-
   cd $home
   touch $mark
 fi
