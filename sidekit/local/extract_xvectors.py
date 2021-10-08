@@ -96,7 +96,6 @@ def main(xtractor, kaldi_wav_scp, device):
             signal = signal.to(device)
             _, vec = xtractor(signal, is_eval=True)
             writer(key, vec.detach().cpu().numpy())
-            quit(0)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract the x-vectors given a sidekit model")
