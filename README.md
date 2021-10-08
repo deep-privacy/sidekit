@@ -2,7 +2,7 @@ SIDEKIT
 =======
 
 SIDEKIT is an open source package for Speaker and Language recognition.  
-This repo provides the python/pyTorch implementation the Deep Neural Network based Automatic Speaker Recognition systems and training losses of: [Larcher/sidekit](https://git-lium.univ-lemans.fr/Larcher/sidekit)
+This repo provides the python/pytorch implementation the Deep Neural Network based Automatic Speaker Recognition systems and training losses of: [Larcher/sidekit](https://git-lium.univ-lemans.fr/Larcher/sidekit)
 
 Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
 
