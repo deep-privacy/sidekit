@@ -2,7 +2,7 @@ SIDEKIT
 =======
 
 SIDEKIT is an open source package for Speaker and Language recognition.  
-This repo provides Python/PyTorch implementation of multiple Deep Neural Network based speaker recognition system and training loss extracted from: [Larcher/sidekit](https://git-lium.univ-lemans.fr/Larcher/sidekit)  
+This repo provides the python/pyTorch implementation the Deep Neural Network based Automatic Speaker Recognition systems and training losses of: [Larcher/sidekit](https://git-lium.univ-lemans.fr/Larcher/sidekit)
 
 Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
 
@@ -11,7 +11,7 @@ Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
 ```sh
 git clone https://github.com/deep-privacy/sidekit
 cd sidekit
-# you might need to adjust $CUDAROOT of ./install.sh 
+# you might need to adjust $CUDAROOT of ./install.sh
 # to match your cuda config. default /usr/local/cuda
 ./install.sh
 ```
@@ -20,12 +20,12 @@ cd sidekit
 
 #### For kaldi-like wav.scp
 
-Model: HalfResNet34
-Trained with Loss: [Large margin arc distance](https://arxiv.org/pdf/1904.03479.pdf)
-Trained on: VoxCeleb1 & 2
-Test EER on vox1-O: `1.20 %`
+Model: HalfResNet34  
+Trained with Loss: [Large margin arc distance](https://arxiv.org/pdf/1904.03479.pdf)  
+Trained on: VoxCeleb1 & 2  
+Test EER on vox1-O: `1.20 %`  
 
-```
+```sh
 # activate the miniconda venv
 . ./env.sh
 
