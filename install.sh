@@ -87,4 +87,15 @@ if [ ! -f $mark ]; then
   touch $mark
 fi
 
+
+mark=.done-other-python-requirements
+if [ ! -f $mark ]; then
+  echo " == Installing python libraries =="
+
+  pip3 install kaldiio
+
+  cd $home
+  touch $mark
+fi
+
 echo " == Everything got installed successfully =="
