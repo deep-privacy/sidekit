@@ -1,7 +1,7 @@
 SIDEKIT
 =======
 
-SIDEKIT is an open source package for Speaker and Language recognition.  
+SIDEKIT is an open source package for Speaker and Language recognition.
 This repo provides the python/pytorch implementation the Deep Neural Network based Automatic Speaker Recognition systems and training losses of: [Larcher/sidekit](https://git-lium.univ-lemans.fr/Larcher/sidekit)
 
 Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
@@ -20,16 +20,15 @@ cd sidekit
 
 #### For kaldi-like wav.scp
 
-Model: HalfResNet34  
-Trained with Loss: [Large margin arc distance](https://arxiv.org/pdf/1904.03479.pdf)  
-Trained on: VoxCeleb1 & 2  
-Test EER on vox1-O: `1.20 %`  
-
 ```sh
 # activate the miniconda venv
 . ./env.sh
 
 # download trained model
+# Model: HalfResNet34
+# Trained with Loss: Large margin arc distance
+# Trained on: VoxCeleb1 & 2
+# Test EER on vox1-O: `1.20 %`
 wget https://github.com/deep-privacy/sidekit/releases/download/sidekit_v0.1/best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71
 
 # wav.scp to extract (kaldi-like)
