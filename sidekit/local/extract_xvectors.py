@@ -8,7 +8,6 @@ import argparse
 import subprocess
 
 import kaldiio
-import numpy
 import soundfile
 
 def read_wav_scp(wav_scp):
@@ -85,12 +84,13 @@ def load_model(model_path, device):
     return xtractor
 
 @torch.no_grad()
-def main(xtractor, kaldi_wav_scp, device):
+def main(xtractor, kaldi_wav_scp, out_file, device):
     device = torch.device(device)
 
     utt2wav = read_wav_scp(kaldi_wav_scp)
+    out_ark = os.path.join(os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0])
 
-    with kaldiio.WriteHelper('ark:-') as writer:
+    with kaldiio.WriteHelper(f'ark,scp:{out_ark}.ark,{out_file}') as writer:
         for key, wav in utt2wav.items():
             signal = prepare(wav)
             signal = signal.to(device)
@@ -101,7 +101,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract the x-vectors given a sidekit model")
     parser.add_argument("--model", type=str, help="SideKit model", required=True)
     parser.add_argument("--wav-scp", type=str, required=True)
+    parser.add_argument("--out-scp", type=str, required=True)
     parser.add_argument("--device", default="cuda"if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inferance")
     args = parser.parse_args()
+
+    assert os.path.isfile(args.model), "NO SUCH FILE: %s" % args.model
+    assert os.path.isfile(args.wav_scp), "NO SUCH FILE: %s" % args.wav_scp
+    assert os.path.isdir(os.path.dirname(args.out_scp)), "NO SUCH DIRECTORY: %s" % args.out_scp
     xtractor = load_model(args.model, args.device)
-    main(xtractor, args.wav_scp, args.device)
+    main(xtractor, args.wav_scp, args.out_scp, args.device)

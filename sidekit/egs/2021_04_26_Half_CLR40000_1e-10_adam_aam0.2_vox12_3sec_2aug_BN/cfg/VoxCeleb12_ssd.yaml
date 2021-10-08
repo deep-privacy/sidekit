@@ -10,14 +10,6 @@ dataset_csv: list/vox12.csv
 # awk -F, 'x[$1]<10;{x[$1]++}' vox12.csv  > vox12_DEV.csv
 # dataset_csv: list/vox12_DEV.csv
 
-# DEV4S smaller dataset (with only long utterances):
-# (head -n 2 list/vox12_DEV.csv ; cat list/vox12_DEV.csv | sort -t , -k 5,5  -rn | head -n 7204) > list/vox12_DEV_long.csv
-# tail -n +2 list/vox12_DEV.csv | cut -d , -f 1 | sort | uniq > /tmp/len
-# tail -n +2 list/vox12_DEV_long.csv | cut -d, -f2- > /tmp/vox12_DEV_long_side.csv
-# paste -d',' /tmp/len /tmp/vox12_DEV_long_side.csv > /tmp/vox12_DEV_long_wrongspkid.csv
-# (head -n 2 list/vox12_DEV.csv; cat /tmp/vox12_DEV_long_wrongspkid.csv) > list/vox12_DEV_long.csv
-# dataset_csv: list/vox12_DEV_long_sorted.csv
-
 sample_rate: 16000
 
 validation_ratio: 0.02
