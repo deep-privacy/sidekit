@@ -21,13 +21,12 @@ if [ ! -d $CUDAROOT ]; then
   echo "CUDAROOT: '$FILE' does not exist."
   echo "Installing for CPU compute platform!"
   cuda_version="cpu"
+  cuda_version_witout_dot=$cuda_version
   sleep 2
 else
   cuda_version=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
+  cuda_version_witout_dot=$(echo cu"$cuda_version" | xargs | sed 's/\.//')
 fi
-
-cuda_version_witout_dot=$(echo $cuda_version | xargs | sed 's/\.//')
-
 
 # CONDA
 conda_url=https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -67,13 +66,13 @@ export CFLAGS="-I$CUDAROOT/include $CFLAGS"
 export CUDA_HOME=$CUDAROOT
 export CUDA_PATH=$CUDAROOT
 
-echo "if [ \$(which python) != $venv_dir/bin/python ]; then source $venv_dir/bin/activate; fi; export CUDAROOT=$CUDAROOT; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;" > env.sh
+echo "if [ \"\$(which python)\" != $venv_dir/bin/python ]; then source $venv_dir/bin/activate; fi; export CUDAROOT=$CUDAROOT; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;" > env.sh
 
 mark=.done-pytorch
 if [ ! -f $mark ]; then
   echo " == Installing pytorch $torch_version for cuda $cuda_version =="
   # pip3 install torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
-  pip3 install torch==$torch_version+cu$cuda_version_witout_dot torchvision==$torchvision_version+cu$cuda_version_witout_dot torchaudio==$torchaudio_version -f $torch_wheels
+  pip3 install torch==$torch_version+$cuda_version_witout_dot torchvision==$torchvision_version+$cuda_version_witout_dot torchaudio==$torchaudio_version -f $torch_wheels
   cd $home
   touch $mark
 fi
