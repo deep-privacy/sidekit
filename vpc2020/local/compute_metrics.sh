@@ -18,7 +18,7 @@ for suff in 'dev' 'test'; do
   asv_test+=("libri_${suff}_enrolls_anon,libri_${suff}_trials_m_anon")
 done
 
-# vctk non-common
+# vctk diff and common sets
 for common in '_all' '_common'; do
   for suff in 'dev' 'test'; do
     # Baseline on clear speech
