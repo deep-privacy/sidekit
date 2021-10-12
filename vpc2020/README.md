@@ -7,7 +7,7 @@ This repository provides the SIDEKIT-based ASV evaluation of the [VPC2020](https
 
 ```bash
 # Download VPC2020 clear/anonymized speech
-cp /home/pchampion/vpc_baseline_speech/vpc2020_clear_anon_speech.zip . # TODO upload it somewhere
+wget https://huggingface.co/datasets/Champion/vpc2020_clear_anon_speech/resolve/main/vpc2020_clear_anon_speech.zip
 unzip -P XXXX vpc2020_clear_anon_speech.zip
 
 # make data dir

@@ -41,7 +41,7 @@ for asv_row in "${asv_test[@]}"; do
 
         for data_dir in "$enroll" "$trial"; do
           if [[ ! -f ./data/$data_dir/x_vector.scp ]]; then
-            >&2 echo "Extracting x-vector of $data_dir"
+            >&2 echo -e "Extracting x-vectors of $data_dir"
             python3 ../sidekit/local/extract_xvectors.py \
               --model $asv_model \
               --wav-scp ./data/$data_dir/wav.scp \
