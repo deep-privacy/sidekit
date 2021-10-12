@@ -19,11 +19,11 @@ for suff in 'dev' 'test'; do
 done
 
 # vctk diff and common sets
-for common in '_all' '_common'; do
+for common in '' '_common'; do
   for suff in 'dev' 'test'; do
     # Baseline on clear speech
-    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f$(echo $common | sed -e s/_all//g)")
-    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_m$(echo $common | sed -e s/_all//g)")
+    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f${common}")
+    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_m${common}")
 
     # Ignorant attacker
     asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f${common}_anon")

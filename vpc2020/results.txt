@@ -54,22 +54,22 @@ ASV: vctk_dev_enrolls - vctk_dev_trials_m
 EER: 0.07
 Cllr (min/act): 0.002412 0.833251
 linkability: 0.996806
-ASV: vctk_dev_enrolls - vctk_dev_trials_f_all_anon
-EER: 45.36
-Cllr (min/act): 0.982799 0.996188
-linkability: 0.065387
-ASV: vctk_dev_enrolls - vctk_dev_trials_m_all_anon
-EER: 37.54
-Cllr (min/act): 0.933248 0.986034
-linkability: 0.176371
-ASV: vctk_dev_enrolls_anon - vctk_dev_trials_f_all_anon
-EER: 30.77
-Cllr (min/act): 0.838717 1.081523
-linkability: 0.299525
-ASV: vctk_dev_enrolls_anon - vctk_dev_trials_m_all_anon
-EER: 27.85
-Cllr (min/act): 0.776576 1.059333
-linkability: 0.355852
+ASV: vctk_dev_enrolls - vctk_dev_trials_f_anon
+EER: 45.86
+Cllr (min/act): 0.982754 0.997015
+linkability: 0.071664
+ASV: vctk_dev_enrolls - vctk_dev_trials_m_anon
+EER: 37.28
+Cllr (min/act): 0.932600 0.986369
+linkability: 0.183144
+ASV: vctk_dev_enrolls_anon - vctk_dev_trials_f_anon
+EER: 27.66
+Cllr (min/act): 0.796454 1.075394
+linkability: 0.357765
+ASV: vctk_dev_enrolls_anon - vctk_dev_trials_m_anon
+EER: 25.04
+Cllr (min/act): 0.725346 1.051117
+linkability: 0.410946
 ASV: vctk_test_enrolls - vctk_test_trials_f
 EER: 0.54
 Cllr (min/act): 0.019561 0.876470
@@ -78,22 +78,22 @@ ASV: vctk_test_enrolls - vctk_test_trials_m
 EER: 0.09
 Cllr (min/act): 0.002705 0.832148
 linkability: 0.995250
-ASV: vctk_test_enrolls - vctk_test_trials_f_all_anon
-EER: 44.01
-Cllr (min/act): 0.975888 0.996978
-linkability: 0.075997
-ASV: vctk_test_enrolls - vctk_test_trials_m_all_anon
-EER: 41.94
-Cllr (min/act): 0.967272 0.991200
-linkability: 0.116717
-ASV: vctk_test_enrolls_anon - vctk_test_trials_f_all_anon
-EER: 35.32
-Cllr (min/act): 0.884516 1.087465
-linkability: 0.232368
-ASV: vctk_test_enrolls_anon - vctk_test_trials_m_all_anon
-EER: 27.27
-Cllr (min/act): 0.759240 1.059919
-linkability: 0.383467
+ASV: vctk_test_enrolls - vctk_test_trials_f_anon
+EER: 45.02
+Cllr (min/act): 0.980109 0.999184
+linkability: 0.068852
+ASV: vctk_test_enrolls - vctk_test_trials_m_anon
+EER: 42.10
+Cllr (min/act): 0.963744 0.991984
+linkability: 0.127337
+ASV: vctk_test_enrolls_anon - vctk_test_trials_f_anon
+EER: 32.36
+Cllr (min/act): 0.852477 1.081698
+linkability: 0.275125
+ASV: vctk_test_enrolls_anon - vctk_test_trials_m_anon
+EER: 25.37
+Cllr (min/act): 0.718891 1.052791
+linkability: 0.420270
 ASV: vctk_dev_enrolls - vctk_dev_trials_f_common
 EER: 0.45
 Cllr (min/act): 0.009887 0.852406
