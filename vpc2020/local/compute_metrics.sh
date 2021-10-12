@@ -41,12 +41,13 @@ for asv_row in "${asv_test[@]}"; do
 
         for data_dir in "$enroll" "$trial"; do
           if [[ ! -f ./data/$data_dir/x_vector.scp ]]; then
-            echo "Extracting x-vector of $data_dir"
+            >&2 echo "Extracting x-vector of $data_dir"
             python3 ../sidekit/local/extract_xvectors.py \
               --model $asv_model \
               --wav-scp ./data/$data_dir/wav.scp \
               --out-scp ./data/$data_dir/x_vector.scp || exit 1
           fi
+          if [[ ! "$(wc -l < ./data/$data_dir/wav.scp)" -eq "$(wc -l < ./data/$data_dir/x_vector.scp)" ]]; then >&2 echo -e "\nWarning: Something went wrong during the x-vector extraction!\nPlease redo the extraction:\n\trm ./data/$data_dir/x_vector.scp\n" && exit 2; fi
         done
 
         python3 ../sidekit/local/compute_spk_cosine.py \

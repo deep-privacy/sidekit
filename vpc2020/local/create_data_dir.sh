@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-home=$PWD
-
 mkdir -p data
 
 for name in wav_anon wav_clear; do
-      [ ! -d $name ] && echo "Directory $name does not exist.\nPlease download and unzip vpc_baseline_speech.zip" && exit 1
+      [ ! -d $name ] && echo "Directory $name does not exist.\nPlease download and unzip the data file" && exit 1
 done
 
 search_dir="./wav_anon"
