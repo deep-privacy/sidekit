@@ -22,8 +22,8 @@ done
 for common in '_all' '_common'; do
   for suff in 'dev' 'test'; do
     # Baseline on clear speech
-    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f")
-    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_m")
+    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f$(echo $common | sed -e s/_all//g)")
+    asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_m$(echo $common | sed -e s/_all//g)")
 
     # Ignorant attacker
     asv_test+=("vctk_${suff}_enrolls,vctk_${suff}_trials_f${common}_anon")

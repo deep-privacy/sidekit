@@ -7,7 +7,7 @@ This repository provides the SIDEKIT-based ASV evaluation of the [VPC2020](https
 
 ```bash
 # Download VPC2020 clear/anonymized speech
-wget https://github.com/deep-privacy/sidekit/releases/download/vpc2020data/vpc2020_clear_anon_speech.zip
+cp /home/pchampion/vpc_baseline_speech/vpc2020_clear_anon_speech.zip . # TODO upload it somewhere
 unzip -P XXXX vpc2020_clear_anon_speech.zip
 
 # make data dir
