@@ -88,9 +88,9 @@ def main(xtractor, kaldi_wav_scp, out_file, device):
     device = torch.device(device)
 
     utt2wav = read_wav_scp(kaldi_wav_scp)
-    out_ark = os.path.join(os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0])
+    out_ark = os.path.realpath(os.path.join(os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]))
 
-    with kaldiio.WriteHelper(f'ark,scp:{out_ark}.ark,{out_file}') as writer:
+    with kaldiio.WriteHelper(f'ark,scp:{out_ark}.ark,{os.path.realpath(out_file)}') as writer:
         for key, wav in utt2wav.items():
             signal = prepare(wav)
             signal = signal.to(device)

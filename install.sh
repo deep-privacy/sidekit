@@ -97,4 +97,14 @@ if [ ! -f $mark ]; then
   touch $mark
 fi
 
+mark=.done-anonymization_metrics
+if [ ! -f $mark ]; then
+  mkdir -p utils
+  cd utils
+  git clone https://gitlab.inria.fr/magnet/anonymization_metrics.git
+  cd $home
+  pip3 install seaborn
+  touch $mark
+fi
+
 echo " == Everything got installed successfully =="
