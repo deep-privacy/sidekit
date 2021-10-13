@@ -32,7 +32,7 @@ cd sidekit
 wget https://github.com/deep-privacy/sidekit/releases/download/sidekit_v0.1/best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71
 
 # wav.scp to extract (kaldi-like)
-cat ./wav_example.scp
+cat ./examples/wav_example.scp
 
 lbi-1272-128104-0000 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128104-0000.flac |
 lbi-1272-128104-0001 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128104-0000.flac |
@@ -40,7 +40,7 @@ lbi-1272-128104-0002 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128
 
 # extract and store the x-vectors in a scp,ark file
 python3 sidekit/local/extract_xvectors.py --model ./best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71 \
-  --device cuda --wav-scp ./wav_example.scp --out-scp ./x-vector.scp
+        --wav-scp ./examples/wav_example.scp --out-scp ./examples/x-vector.scp
 ```
 
 #### For Python
