@@ -2,8 +2,6 @@
 
 set -e
 
-nj=$(nproc)
-
 home=$PWD
 
 # CUDA version
@@ -20,12 +18,12 @@ fi
 if [ ! -d $CUDAROOT ]; then
   echo "CUDAROOT: '$FILE' does not exist."
   echo "Installing for CPU compute platform!"
-  compute_plarform="cpu"
-  compute_platform_witout_dot=$compute_plarform
+  compute_platform="cpu"
+  compute_platform_witout_dot=$compute_platform
   sleep 2
 else
-  compute_plarform=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
-  compute_platform_witout_dot=$(echo cu"$compute_plarform" | xargs | sed 's/\.//')
+  compute_platform=$($CUDAROOT/bin/nvcc --version | grep "Cuda compilation tools" | cut -d" " -f5 | sed s/,//)
+  compute_platform_witout_dot=$(echo cu"$compute_platform" | xargs | sed 's/\.//')
 fi
 
 # CONDA
@@ -70,7 +68,7 @@ echo "if [ \"\$(which python)\" != $venv_dir/bin/python ]; then source $venv_dir
 
 mark=.done-pytorch
 if [ ! -f $mark ]; then
-  echo " == Installing pytorch $torch_version for cuda $compute_plarform =="
+  echo " == Installing pytorch $torch_version for cuda $compute_platform =="
   # pip3 install torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
   pip3 install torch==$torch_version+$compute_platform_witout_dot torchvision==$torchvision_version+$compute_platform_witout_dot torchaudio==$torchaudio_version -f $torch_wheels
   cd $home

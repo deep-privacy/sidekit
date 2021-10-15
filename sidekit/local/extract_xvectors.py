@@ -102,11 +102,15 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str, help="SideKit model", required=True)
     parser.add_argument("--wav-scp", type=str, required=True)
     parser.add_argument("--out-scp", type=str, required=True)
-    parser.add_argument("--device", default="cuda"if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inferance")
+    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inference")
     args = parser.parse_args()
 
     assert os.path.isfile(args.model), "NO SUCH FILE: %s" % args.model
     assert os.path.isfile(args.wav_scp), "NO SUCH FILE: %s" % args.wav_scp
     assert os.path.isdir(os.path.dirname(args.out_scp)), "NO SUCH DIRECTORY: %s" % args.out_scp
+    # If cuda device is requested, check if cuda is available
+    args.device = args.device.strip().lower()
+    if args.device == "cuda":
+        assert torch.cuda.is_available(), "CUDA is not available, check configuration or run on cpu (--device cpu)"
     xtractor = load_model(args.model, args.device)
     main(xtractor, args.wav_scp, args.out_scp, args.device)
