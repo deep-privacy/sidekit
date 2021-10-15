@@ -50,6 +50,8 @@ def main(args):
     utt2embd_enroll_mean = {}
     for spk, uttrs in spk2utt.items():
         mean = np.mean([utt2embd_enroll[utt] for utt in uttrs], axis=0)
+        norm = np.linalg.norm(mean, ord=2)
+        mean /= norm
         utt2embd_enroll_mean[spk] = mean
 
     utt2embd_enroll_mean = [utt2embd_enroll_mean[utt] for utt in utt1s]
