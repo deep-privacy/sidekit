@@ -18,3 +18,14 @@ local/create_data_dir.sh
 ```bash
 local/compute_metrics.sh > results.txt
 ```
+
+#### Train x-vectors extractor from Librispeech
+```bash
+# Create dataset csv file for model input (make sure you have download Librispeech dataset before)
+python3 local/create_dataset_csv.py --libri-root /home/LibriSpeechRoot/ --out_filepath list/libri360.csv
+
+# Change YAML files in cfg directory to personalize training (hyperparameters, ...)
+
+# Run training
+local/train.sh 
+```

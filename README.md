@@ -67,7 +67,7 @@ xtractor.load_state_dict(model_config["model_state_dict"], strict=True)
 xtractor = xtractor.to(device)
 xtractor.eval()
 
-wav_tensor, sample_rate = torchaudio.load("example.wav")
+wav_tensor, sample_rate = torchaudio.load("examples/1272-128104-0000.wav")
 _, vec = xtractor(wav_tensor.to(device), is_eval=True)
 print(vec.shape)
 ```
