@@ -17,4 +17,3 @@ python3 -m torch.distributed.launch \
        --nnodes=$NUM_NODES \
        --node_rank $NODE_RANK \
        train_xtractor.py
-#python3 train_xtractor.py --local_rank 0
