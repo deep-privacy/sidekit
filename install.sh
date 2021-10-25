@@ -78,7 +78,6 @@ fi
 mark=.done-sidekit
 if [ ! -f $mark ]; then
   echo " == Building sidekit =="
-  cd sidekit
   pip3 install -e .
   cd $home
   touch $mark
@@ -97,8 +96,7 @@ fi
 
 mark=.done-anonymization_metrics
 if [ ! -f $mark ]; then
-  mkdir -p utils
-  cd utils
+  cd tools
   git clone https://gitlab.inria.fr/magnet/anonymization_metrics.git
   cd $home
   pip3 install seaborn

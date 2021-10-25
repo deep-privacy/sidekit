@@ -11,7 +11,7 @@ Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
 ```sh
 git clone https://github.com/deep-privacy/sidekit
 cd sidekit
-# you might need to adjust $CUDAROOT of ./install.sh
+# you might need to adjust $CUDAROOT in ./install.sh
 # to match your cuda config. default /usr/local/cuda
 ./install.sh
 ```
@@ -32,15 +32,11 @@ cd sidekit
 wget https://github.com/deep-privacy/sidekit/releases/download/sidekit_v0.1/best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71
 
 # wav.scp to extract (kaldi-like)
-cat ./examples/wav_example.scp
-
-lbi-1272-128104-0000 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128104-0000.flac |
-lbi-1272-128104-0001 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128104-0000.flac |
-lbi-1272-128104-0002 flac -c -d -s ex/LibriSpeech/dev-clean/1272/128104/1272-128104-0000.flac |
+cd egs/examples_decode
 
 # extract and store the x-vectors in a scp,ark file
-python3 sidekit/local/extract_xvectors.py --model ./best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71 \
-        --wav-scp ./examples/wav_example.scp --out-scp ./examples/x-vector.scp
+extract_xvectors.py --model ../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71 \
+        --wav-scp ./wav_example.scp --out-scp ./x-vector.scp
 ```
 
 #### For Python
@@ -67,7 +63,7 @@ xtractor.load_state_dict(model_config["model_state_dict"], strict=True)
 xtractor = xtractor.to(device)
 xtractor.eval()
 
-wav_tensor, sample_rate = torchaudio.load("examples/1272-128104-0000.wav")
+wav_tensor, sample_rate = torchaudio.load("egs/examples_decode/1272-128104-0000.wav")
 _, vec = xtractor(wav_tensor.to(device), is_eval=True)
 print(vec.shape)
 ```

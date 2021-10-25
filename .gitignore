@@ -7,7 +7,9 @@ kaldi
 corpora
 kaldifeat
 *.egg-info/
-utils/anonymization_metrics/
+tools/anonymization_metrics/
+*.scp
+*.ark
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
