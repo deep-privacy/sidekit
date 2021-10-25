@@ -18,6 +18,7 @@ import tarfile
 from zipfile import ZipFile
 from tqdm import tqdm
 from scipy.io import wavfile
+from pathlib import Path
 
 import torchaudio
 import csv
@@ -27,13 +28,13 @@ import csv
 ## ========== ===========
 parser = argparse.ArgumentParser(description="Librispeech dataset preparation")
 
-parser.add_argument("--save_path", type=str, default="data", help="Target directory")
+parser.add_argument("--save-path", type=str, default="data", help="Target directory")
 
 parser.add_argument(
     "--download", dest="download", action="store_true", help="Enable download"
 )
 parser.add_argument(
-    "--augment",
+    "--download-augment",
     dest="augment",
     action="store_true",
     help="Download and extract augmentation files",
@@ -44,8 +45,20 @@ parser.add_argument(
     action="store_true",
     help="Create the training sidekit csv",
 )
+parser.add_argument(
+    "--make-csv-augment-reverb",
+    dest="make_aug_csv_reverb",
+    action="store_true",
+    help="Create the dataset aug sidekit csv",
+)
+parser.add_argument(
+    "--make-csv-augment-noise",
+    dest="make_aug_csv_noise",
+    action="store_true",
+    help="Create the dataset aug sidekit csv",
+)
 
-## args for --make-train-csv
+## args for --make-*-csv
 parser.add_argument(
     "--from",
     default="./data/LibriSpeech",
@@ -54,7 +67,7 @@ parser.add_argument(
     help="Path to the root of the dataset",
 )
 parser.add_argument(
-    "--out_csv", default="list/libri.csv", type=str, help="File to the output csv"
+    "--out-csv", default="list/libri.csv", type=str, help="File to the output csv"
 )
 parser.add_argument(
     "--fullpath",
@@ -63,10 +76,10 @@ parser.add_argument(
     help='List training audio files with their full path, otherwise relative to "root"',
 )
 parser.add_argument(
-    "--filter_dataset",
+    "--filter-dataset",
     type=list,
     default=["train-clean-360"],
-    help="List of dataset of process.",
+    help="List of dataset of process Default: ['train-clean-360']",
 )
 
 
@@ -90,9 +103,17 @@ def download(args, lines):
         md5gt = line.split()[1]
         outfile = url.split("/")[-1]
 
+        if os.path.exists("%s/%s" % (args.save_path, outfile)):
+            print("File '%s' exist checking md5.." % outfile)
+            md5ck = md5("%s/%s" % (args.save_path, outfile))
+            if md5ck == md5gt:
+                print("Skipping already downloaded '%s' md5 match." % outfile)
+                continue
+
         ## Download files
         out = subprocess.call(
-            "wget %s -O %s/%s" % (url, args.save_path, outfile), shell=True
+            "wget --no-check-certificate %s -O %s/%s" % (url, args.save_path, outfile),
+            shell=True,
         )
         if out != 0:
             raise ValueError(
@@ -141,7 +162,7 @@ def split_musan(args):
     files = glob.glob("%s/musan/*/*/*.wav" % args.save_path)
 
     audlen = 16000 * 5
-    audstr = 16000 * 3
+    audstr = audlen
 
     for idx, file in enumerate(files):
         fs, aud = wavfile.read(file)
@@ -154,10 +175,106 @@ def split_musan(args):
 
 
 ## ========== ===========
-## Create sidekit csv file (training and data augmentation)
+## Create sidekit csv file
+##  FOR AUGMENTATAION
+## ========== ===========
+def make_aug_csv_reverb(root_data, out_filepath, fullpath):
+    with open(out_filepath, "w", newline="") as out_csv_file:
+        csv_writer = csv.writer(
+            out_csv_file, delimiter=",", quotechar="|", quoting=csv.QUOTE_MINIMAL
+        )
+
+        # Write header
+        csv_writer.writerow(
+            [
+                "channel",
+                "database",
+                "file_id",
+                "type",
+            ]
+        )
+        wav_count = 0
+        pbar = tqdm(os.walk(root_data))
+        for root, dirs, files in pbar:
+            if Path(root).parent == Path(root_data):
+                dataset = root.split("/")[-1]
+            for file in files:
+                file_path = os.path.join(root, file)
+                if os.path.splitext(file_path)[1] == ".wav":
+                    wav_count += 1
+                    pbar.set_description(f"wav count : {wav_count}")
+                    try:
+                        audio_info = torchaudio.info(file_path)
+                    except Exception:
+                        print("failed to load info of:", file_path)
+                        continue
+                    if fullpath.lower() == "true":
+                        file_id = os.path.realpath(file_path)
+                    else:
+                        # Remove file root_data
+                        file_id = file_path.replace(root_data, "")
+                        # Remove first slash if present (it is not root_data)
+                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+
+                    csv_writer.writerow([1.0, "REVERB", file_id, dataset])
+
+
+def make_aug_csv_noise(root_data, out_filepath, fullpath):
+    with open(out_filepath, "w", newline="") as out_csv_file:
+        csv_writer = csv.writer(
+            out_csv_file, delimiter=",", quotechar="|", quoting=csv.QUOTE_MINIMAL
+        )
+
+        # Write header
+        csv_writer.writerow(
+            [
+                "database",
+                "type",
+                "file_id",
+                "start",
+                "duration",
+            ]
+        )
+        wav_count = 0
+        pbar = tqdm(os.walk(root_data))
+        for root, dirs, files in pbar:
+            if Path(root).parent == Path(root_data):
+                dataset = root.split("/")[-1]
+            for file in files:
+                file_path = os.path.join(root, file)
+                if os.path.splitext(file_path)[1] == ".wav":
+                    wav_count += 1
+                    pbar.set_description(f"wav count : {wav_count}")
+                    try:
+                        audio_info = torchaudio.info(file_path)
+                        duration = audio_info.num_frames / audio_info.sample_rate
+                    except Exception:
+                        print("failed to load info of:", file_path)
+                        continue
+                    if fullpath.lower() == "true":
+                        file_id = os.path.realpath(file_path)
+                    else:
+                        # Remove file root_data
+                        file_id = file_path.replace(root_data, "")
+                        # Remove first slash if present (it is not root_data)
+                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+
+                    csv_writer.writerow(
+                        [
+                            "musan",
+                            dataset,
+                            file_id,
+                            0.0,
+                            duration,
+                        ]
+                    )
+
+
+## ========== ===========
+## Create sidekit csv file
 ##    FOR LIBRISPEECH
 ## ========== ===========
-def make_train_csv(root_data, out_filepath, out_csv, fullpath, filter_dataset):
+def make_train_csv(root_data, out_filepath, fullpath, filter_dataset):
     # Retrieve gender for Librispeech speakers
     spk_file = open(os.path.join(root_data, "SPEAKERS.TXT"), "r")
     spk_gender_dict = {}
@@ -224,13 +341,41 @@ def make_train_csv(root_data, out_filepath, out_csv, fullpath, filter_dataset):
 if __name__ == "__main__":
     args = parser.parse_args()
 
+    if args.make_aug_csv_reverb:
+        if not os.path.exists(args._from):
+            raise ValueError(f"Dataset directory '{args._from}' does not exist.")
+
+        if args._from == parser.get_default("_from"):
+            # change default to downloaded reverb
+            args._from = "./data/RIRS_NOISES"
+
+        if args.out_csv == parser.get_default("out_csv"):
+            # change default to output reverb list
+            args.out_csv = "list/reverb.csv"
+
+        make_aug_csv_reverb(args._from, args.out_csv, args.fullpath)
+        sys.exit(0)
+
+    if args.make_aug_csv_noise:
+        if not os.path.exists(args._from):
+            raise ValueError(f"Dataset directory '{args._from}' does not exist.")
+
+        if args._from == parser.get_default("_from"):
+            # change default to downloaded reverb
+            args._from = "./data/musan_split"
+
+        if args.out_csv == parser.get_default("out_csv"):
+            # change default to output reverb list
+            args.out_csv = "list/musan.csv"
+
+        make_aug_csv_noise(args._from, args.out_csv, args.fullpath)
+        sys.exit(0)
+
     if args.make_train_csv:
         if not os.path.exists(args._from):
             raise ValueError(f"Dataset directory '{args._from}' does not exist.")
 
-        make_train_csv(
-            args._from, args.out_csv, args.out_csv, args.fullpath, args.filter_dataset
-        )
+        make_train_csv(args._from, args.out_csv, args.fullpath, args.filter_dataset)
         sys.exit(0)
 
     if not os.path.exists(args.save_path):
