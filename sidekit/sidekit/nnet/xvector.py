@@ -38,6 +38,7 @@ import tqdm
 import yaml
 import pickle
 
+from pathlib import Path
 from collections import OrderedDict
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
@@ -260,7 +261,12 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar', best_filename
     """
     torch.save(state, filename)
     if is_best:
+        symlink = Path(best_filename)
+        best_filename = best_filename + f"_epoch{state['epoch']}" + "_EER_{:.2f}_ACC_{:.2f}.pt".format(state["eer"], state["accuracy"])
         shutil.copyfile(filename, best_filename)
+        if symlink.is_symlink():
+            symlink.unlink()
+        symlink.symlink_to(os.path.basename(best_filename))
 
 
 class TrainingMonitor():
@@ -315,6 +321,7 @@ class TrainingMonitor():
         """
         # TODO
         self.logger.critical(f"***Validation metrics - Cross validation accuracy = {self.val_acc[-1]} %, EER = {self.val_eer[-1] * 100} %")
+        if self.compute_test_eer:
         self.logger.critical(f"***Test metrics - Test EER = {self.test_eer[-1] * 100} %")
 
     def display_final(self):
@@ -1004,7 +1011,7 @@ def get_network(model_opts, local_rank):
     :return:
     """
 
-    if model_opts["model_type"] in ["xvector", "rawnet2", "resnet34", "fastresnet34", "halfresnet34", "bn_halfresnet34"]:
+    if model_opts["model_type"] in ["xvector", "rawnet2", "resnet34", "fastresnet34", "halfresnet34"]:
         model = Xtractor(model_opts["speaker_number"], model_opts["model_type"], loss=model_opts["loss"]["type"], embedding_size=model_opts["embedding_size"])
     else:
         # Custom type of model
@@ -1242,7 +1249,7 @@ def get_optimizer(model, model_opts, train_opts, training_loader):
 
     elif train_opts["scheduler"]["type"] == "StepLR":
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,
-                                                           step_size=1 * training_loader.__len__(),
+                                                           step_size=0.5 * training_loader.__len__(),
                                                            gamma=0.95)
 
     elif train_opts["scheduler"]["type"] == "StepLR2":
@@ -1259,7 +1266,7 @@ def get_optimizer(model, model_opts, train_opts, training_loader):
     return optimizer, scheduler
 
 
-def save_model(model, training_monitor, model_opts, training_opts, optimizer, scheduler, epoch):
+def save_model(model, training_monitor, model_opts, training_opts, optimizer, scheduler):
     """
 
     :param model:
@@ -1274,16 +1281,14 @@ def save_model(model, training_monitor, model_opts, training_opts, optimizer, sc
     best_name = training_opts["best_model_name"]
     tmp_name = training_opts["tmp_model_name"]
 
-    if epoch is not None:
-        best_name = best_name + f"_epoch{epoch}"
-
     # TODO à reprendre
     if type(model) is Xtractor:
         save_checkpoint({
             'epoch': training_monitor.current_epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'accuracy': training_monitor.best_accuracy,
+            'accuracy': training_monitor.val_acc[-1],
+            'eer': training_monitor.val_eer[-1] * 100,
             'scheduler': scheduler,
             'speaker_number' : model.speaker_number,
             'model_archi': model_opts,
@@ -1294,7 +1299,8 @@ def save_model(model, training_monitor, model_opts, training_opts, optimizer, sc
             'epoch': training_monitor.current_epoch,
             'model_state_dict': model.module.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'accuracy': training_monitor.best_accuracy,
+            'accuracy': training_monitor.val_acc[-1],
+            'eer': training_monitor.val_eer[-1] * 100,
             'scheduler': scheduler,
             'speaker_number': model.module.speaker_number,
             'model_archi': model_opts,
@@ -1519,7 +1525,7 @@ def xtrain(dataset_description,
             # Save the current model and if needed update the best one
             # TODO ajouter une option qui garde les modèles à certaines époques (par exemple avant le changement de LR
             if local_rank < 1:
-                save_model(model, monitor, model_opts, training_opts, optimizer, scheduler, epoch)
+                save_model(model, monitor, model_opts, training_opts, optimizer, scheduler)
 
 
     for ii in range(int(os.environ['WORLD_SIZE'])):
