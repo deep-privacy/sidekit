@@ -8,7 +8,7 @@ The following script can be used to download and prepare the LibriSpeech dataset
 
 ```bash
 python ./dataprep.py --save-path data --download
-python ./dataprep.py --from ./data/LibriSpeech --make-train-csv
+python ./dataprep.py --from ./data/LibriSpeech --make-train-csv # set --filter-dir accordingly
 ```
 
 In order to use data augmentation, also run:

@@ -67,7 +67,3 @@ wav_tensor, sample_rate = torchaudio.load("egs/examples_decode/1272-128104-0000.
 _, vec = xtractor(wav_tensor.to(device), is_eval=True)
 print(vec.shape)
 ```
-
----
-
-Model training, corpus download, and corpus preparation tutorial will come later.

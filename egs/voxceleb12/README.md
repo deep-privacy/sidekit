@@ -2,14 +2,14 @@
 
 This repository contains the framework for training speaker recognition models on VoxCeleb12.
 
-### Data preparation (from: https://github.com/clovaai/voxceleb_trainer)
+### Data preparation
 
 The following script can be used to download and prepare the VoxCeleb dataset for training.
 
 ```bash
 python ./dataprep.py --save-path data --download --user USERNAME --password PASSWORD
-python ./dataprep.py --save-path data --convert
-python ./dataprep.py --from data --make-train-csv
+python ./dataprep.py --save-path ./data --convert
+python ./dataprep.py --from ./data --make-train-csv # set --filter-dir accordingly
 ```
 In order to use data augmentation, also run:
 
