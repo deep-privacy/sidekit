@@ -25,19 +25,18 @@ train:
     transform_number: 1
 
     transformation:
-        #pipeline: add_reverb,add_noise,filtering,phone_filtering,codec
-        pipeline: filtering,phone_filtering,codec
+        pipeline: add_reverb,add_noise,filtering,phone_filtering,codec
 
         spec_aug: 0.5
         temp_aug: 0.5
 
         add_noise:
-            noise_db_csv: /lium/raid01_c/larcher/data/musan_split.csv
-            data_path: /lium/scratch/larcher/musan_split/
+            noise_db_csv: list/musan.csv
+            data_path: /
 
         add_reverb:
             rir_db_csv: list/reverb.csv
-            data_path: /lium/scratch/amehrish/Database/REVERB_UPDATED/REVERB/RIRS_NOISES/
+            data_path: /
 
 # Validation set
 valid:
@@ -49,8 +48,8 @@ valid:
         temp_aug: 0.5
 
         add_noise:
-            noise_db_csv: /lium/raid01_c/larcher/data/musan_split.csv
-            data_path: /lium/scratch/larcher/musan_split/
+            noise_db_csv: list/musan.csv
+            data_path: /
 
 # Test set (ignored)
 test:
