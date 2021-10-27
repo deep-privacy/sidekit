@@ -89,6 +89,7 @@ if [ ! -f $mark ]; then
   echo " == Installing python libraries =="
 
   pip3 install kaldiio
+  pip3 install tabulate
 
   cd $home
   touch $mark
