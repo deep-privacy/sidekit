@@ -28,16 +28,16 @@ import csv
 ## ========== ===========
 parser = argparse.ArgumentParser(description="Librispeech dataset preparation")
 
-parser.add_argument("--save-path", type=str, default="data", help="Target directory")
+parser.add_argument("--save-path", type=str, default="data", help="Target directory to download the dataset")
 
 parser.add_argument(
-    "--download", dest="download", action="store_true", help="Enable download"
+    "--download", dest="download", action="store_true", help="Download and extract the dataset"
 )
 parser.add_argument(
     "--download-augment",
     dest="augment",
     action="store_true",
-    help="Download and extract augmentation files",
+    help="Download and extract augmentation datasets",
 )
 parser.add_argument(
     "--make-train-csv",
@@ -73,14 +73,14 @@ parser.add_argument(
     "--fullpath",
     type=str,
     default="True",
-    help='List training audio files with their full path, otherwise relative to "root"',
+    help='List training audio files with their full path, otherwise relative to "--from"',
 )
 parser.add_argument(
     "--filter-dir",
     dest="filter_dataset",
     type=str,
     default="train-clean-360",
-    help="List of dirs of process. Default: 'train-clean-360' delimited with ','",
+    help="List of dirs of process. Default: 'train-clean-360' (delimited with ',')",
 )
 
 

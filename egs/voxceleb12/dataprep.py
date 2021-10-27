@@ -28,12 +28,12 @@ import csv
 ## ========== ===========
 parser = argparse.ArgumentParser(description="VoxCeleb12 dataset preparation")
 
-parser.add_argument("--save-path", type=str, default="data", help="Target directory")
+parser.add_argument("--save-path", type=str, default="data", help="Target directory to download the dataset")
 parser.add_argument("--user", type=str, default="user", help="Username")
 parser.add_argument("--password", type=str, default="pass", help="Password")
 
 parser.add_argument(
-    "--download", dest="download", action="store_true", help="Enable download"
+    "--download", dest="download", action="store_true", help="Download and extract the dataset"
 )
 parser.add_argument(
     "--convert", dest="convert", action="store_true", help="Enable convert"
@@ -42,7 +42,7 @@ parser.add_argument(
     "--download-augment",
     dest="augment",
     action="store_true",
-    help="Download and extract augmentation files",
+    help="Download and extract augmentation datasets",
 )
 parser.add_argument(
     "--make-train-csv",
@@ -78,14 +78,14 @@ parser.add_argument(
     "--fullpath",
     type=str,
     default="True",
-    help='List training audio files with their full path, otherwise relative to "root"',
+    help='List training audio files with their full path, otherwise relative to "--from"',
 )
 parser.add_argument(
     "--filter-dir",
     dest="filter_dataset",
     type=str,
     default="voxceleb1/,voxceleb2/",
-    help="List of dirs of process. Default: 'voxceleb1/,voxceleb2/' delimited with ','",
+    help="List of dirs of process. Default: 'voxceleb1/,voxceleb2/' (delimited with ',')",
 )
 
 
