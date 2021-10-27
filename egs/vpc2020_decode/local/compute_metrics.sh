@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-asv_model="../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71"
+asv_model="../libri360_train/model/best_test_libri_train_clean_360.pt"
 
 asv_test=()
 # librispeech
