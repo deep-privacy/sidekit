@@ -84,8 +84,8 @@ parser.add_argument(
     "--filter-dir",
     dest="filter_dataset",
     type=str,
-    default="voxceleb1,voxceleb2",
-    help="List of dir of process. Must be the exact match of one directory (no '/' allow). Default: 'voxceleb1,voxceleb2' delimited with ','",
+    default="voxceleb1/,voxceleb2/",
+    help="List of dirs of process. Default: 'voxceleb1/,voxceleb2/' delimited with ','",
 )
 
 
@@ -163,6 +163,22 @@ def concatenate(args, lines):
 
 
 ## ========== ===========
+## Convert
+## ========== ===========
+def convert(args, files):
+    print("Converting files from AAC to WAV")
+    for fname in tqdm(files):
+        outfile = fname.replace(".m4a", ".wav")
+        out = subprocess.call(
+            "ffmpeg -y -i %s -ac 1 -vn -acodec pcm_s16le -ar 16000 %s >/dev/null 2>/dev/null"
+            % (fname, outfile),
+            shell=True,
+        )
+        if out != 0:
+            raise ValueError("Conversion failed %s." % fname)
+
+
+## ========== ===========
 ## Extract zip files
 ## ========== ===========
 def full_extract(args, fname):
@@ -186,22 +202,6 @@ def part_extract(args, fname, target):
                 zf.extract(infile, args.save_path)
             # pdb.set_trace()
             # zf.extractall(args.save_path)
-
-
-## ========== ===========
-## Convert
-## ========== ===========
-def convert(args, files):
-    print("Converting files from AAC to WAV")
-    for fname in tqdm(files):
-        outfile = fname.replace(".m4a", ".wav")
-        out = subprocess.call(
-            "ffmpeg -y -i %s -ac 1 -vn -acodec pcm_s16le -ar 16000 %s >/dev/null 2>/dev/null"
-            % (fname, outfile),
-            shell=True,
-        )
-        if out != 0:
-            raise ValueError("Conversion failed %s." % fname)
 
 
 ## ========== ===========
@@ -252,18 +252,7 @@ def make_aug_csv_reverb(root_data, out_filepath, fullpath):
                 if os.path.splitext(file_path)[1] == ".wav":
                     wav_count += 1
                     pbar.set_description(f"wav count : {wav_count}")
-                    try:
-                        audio_info = torchaudio.info(file_path)
-                    except Exception:
-                        print("failed to load info of:", file_path)
-                        continue
-                    if fullpath.lower() == "true":
-                        file_id = os.path.realpath(file_path)
-                    else:
-                        # Remove file root_data
-                        file_id = file_path.replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    file_id = format_file_id(file_path, root_data, fullpath, False)
 
                     csv_writer.writerow([1.0, "REVERB", file_id, dataset])
 
@@ -294,20 +283,8 @@ def make_aug_csv_noise(root_data, out_filepath, fullpath):
                 if os.path.splitext(file_path)[1] == ".wav":
                     wav_count += 1
                     pbar.set_description(f"wav count : {wav_count}")
-                    try:
-                        audio_info = torchaudio.info(file_path)
-                        duration = audio_info.num_frames / audio_info.sample_rate
-                    except Exception:
-                        print("failed to load info of:", file_path)
-                        continue
-                    if fullpath.lower() == "true":
-                        # Remove only file extension
-                        file_id = os.path.splitext(os.path.realpath(file_path))[0]
-                    else:
-                        # Remove file extension and file root_data
-                        file_id = os.path.splitext(file_path)[0].replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    duration = calculate_duration(file_path)
+                    file_id = format_file_id(file_path, root_data, fullpath)
 
                     csv_writer.writerow(
                         [
@@ -347,10 +324,9 @@ def make_train_csv(root_data, out_filepath, fullpath, filter_dataset):
 
         pbar = tqdm(os.walk(root_data))
         for root, dirs, files in pbar:
-            dataset = root.split("/")
             _continue = True
             for _filter in filter_dataset:
-                if _filter in dataset:
+                if _filter in root:
                     _continue = False
                     break
 
@@ -361,25 +337,47 @@ def make_train_csv(root_data, out_filepath, fullpath, filter_dataset):
             for file in files:
                 file_path = os.path.join(root, file)
                 if os.path.splitext(file_path)[1] == ".wav":
+                    dataset = root.split("/")
                     spk_id = dataset[-2]
                     if spk_id not in spk_list:
                         spk_list.append(spk_id)
                     spk_idx = spk_list.index(spk_id)
                     start = 0
-                    audio_info = torchaudio.info(file_path)
-                    duration = audio_info.num_frames / audio_info.sample_rate
-                    if fullpath.lower() == "true":
-                        # Remove only file extension
-                        file_id = os.path.splitext(os.path.realpath(file_path))[0]
-                    else:
-                        # Remove file extension and file root_data
-                        file_id = os.path.splitext(file_path)[0].replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    duration = calculate_duration(file_path)
+                    file_id = format_file_id(file_path, root_data, fullpath)
 
                     csv_writer.writerow(
                         [spk_idx, dataset[-3], spk_id, start, duration, file_id, "-"]
                     )
+
+
+## ========== ===========
+## Create CSV utils
+## ========== ===========
+def format_file_id(file_path, root_data, full_path, remove_extension=True):
+    if remove_extension:
+        file_id = os.path.splitext(os.path.realpath(file_path))[0]
+    else:
+        file_id = os.path.realpath(file_path)
+
+    if full_path.lower() != "true":
+        # Remove file extension and file root_data
+        file_id = file_id.replace(root_data, "")
+        # Remove first slash if present (it is not root_data)
+        file_id = file_id[1:] if file_id[0] == "/" else file_id
+
+    return file_id
+
+
+def calculate_duration(file_path):
+    try:
+        audio_info = torchaudio.info(file_path)
+        duration = audio_info.num_frames / audio_info.sample_rate
+    except Exception:
+        print("failed to load info of:", file_path)
+        duration = 0
+
+    return duration
 
 
 ## ========== ===========

@@ -80,7 +80,7 @@ parser.add_argument(
     dest="filter_dataset",
     type=str,
     default="train-clean-360",
-    help="List of dir of process. Must be the exact match of one directory (no '/' allow). Default: 'train-clean-360' delimited with ','",
+    help="List of dirs of process. Default: 'train-clean-360' delimited with ','",
 )
 
 
@@ -205,18 +205,7 @@ def make_aug_csv_reverb(root_data, out_filepath, fullpath):
                 if os.path.splitext(file_path)[1] == ".wav":
                     wav_count += 1
                     pbar.set_description(f"wav count : {wav_count}")
-                    try:
-                        audio_info = torchaudio.info(file_path)
-                    except Exception:
-                        print("failed to load info of:", file_path)
-                        continue
-                    if fullpath.lower() == "true":
-                        file_id = os.path.realpath(file_path)
-                    else:
-                        # Remove file root_data
-                        file_id = file_path.replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    file_id = format_file_id(file_path, root_data, fullpath, False)
 
                     csv_writer.writerow([1.0, "REVERB", file_id, dataset])
 
@@ -247,20 +236,8 @@ def make_aug_csv_noise(root_data, out_filepath, fullpath):
                 if os.path.splitext(file_path)[1] == ".wav":
                     wav_count += 1
                     pbar.set_description(f"wav count : {wav_count}")
-                    try:
-                        audio_info = torchaudio.info(file_path)
-                        duration = audio_info.num_frames / audio_info.sample_rate
-                    except Exception:
-                        print("failed to load info of:", file_path)
-                        continue
-                    if fullpath.lower() == "true":
-                        # Remove only file extension
-                        file_id = os.path.splitext(os.path.realpath(file_path))[0]
-                    else:
-                        # Remove file extension and file root_data
-                        file_id = os.path.splitext(file_path)[0].replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    duration = calculate_duration(file_path)
+                    file_id = format_file_id(file_path, root_data, fullpath)
 
                     csv_writer.writerow(
                         [
@@ -308,10 +285,9 @@ def make_train_csv(root_data, out_filepath, fullpath, filter_dataset):
 
         pbar = tqdm(os.walk(root_data))
         for root, dirs, files in pbar:
-            dataset = root.split("/")
             _continue = True
             for _filter in filter_dataset:
-                if _filter in dataset:
+                if _filter in root:
                     _continue = False
                     break
 
@@ -327,21 +303,50 @@ def make_train_csv(root_data, out_filepath, fullpath, filter_dataset):
                         spk_list.append(spk_id)
                     spk_idx = spk_list.index(spk_id)
                     start = 0
-                    audio_info = torchaudio.info(file_path)
-                    duration = audio_info.num_frames / audio_info.sample_rate
-                    if fullpath.lower() == "true":
-                        # Remove only file extension
-                        file_id = os.path.splitext(os.path.realpath(file_path))[0]
-                    else:
-                        # Remove file extension and file root_data
-                        file_id = os.path.splitext(file_path)[0].replace(root_data, "")
-                        # Remove first slash if present (it is not root_data)
-                        file_id = file_id[1:] if file_id[0] == "/" else file_id
+                    duration = calculate_duration(file_path)
+                    file_id = format_file_id(file_path, root_data, fullpath)
                     gender = spk_gender_dict[spk_id]
 
                     csv_writer.writerow(
-                        [spk_idx, dataset[-3], spk_id, start, duration, file_id, gender]
+                        [
+                            spk_idx,
+                            root.split("/")[-3],
+                            spk_id,
+                            start,
+                            duration,
+                            file_id,
+                            gender,
+                        ]
                     )
+
+
+## ========== ===========
+## Create CSV utils
+## ========== ===========
+def format_file_id(file_path, root_data, full_path, remove_extension=True):
+    if remove_extension:
+        file_id = os.path.splitext(os.path.realpath(file_path))[0]
+    else:
+        file_id = os.path.realpath(file_path)
+
+    if full_path.lower() != "true":
+        # Remove file extension and file root_data
+        file_id = file_id.replace(root_data, "")
+        # Remove first slash if present (it is not root_data)
+        file_id = file_id[1:] if file_id[0] == "/" else file_id
+
+    return file_id
+
+
+def calculate_duration(file_path):
+    try:
+        audio_info = torchaudio.info(file_path)
+        duration = audio_info.num_frames / audio_info.sample_rate
+    except Exception:
+        print("failed to load info of:", file_path)
+        duration = 0
+
+    return duration
 
 
 ## ========== ===========
