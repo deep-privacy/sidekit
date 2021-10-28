@@ -36,7 +36,7 @@ cd egs/examples_decode
 
 # extract and store the x-vectors in a scp,ark file
 extract_xvectors.py --model ../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71 \
-        --wav-scp ./wav_example.scp --out-scp ./x-vector.scp
+        --wav-scp ./wav_example.scp --out-scp ./x-vector.scp # the "--vad" flag can be use to remove non speech
 ```
 
 #### For Python
@@ -64,6 +64,7 @@ xtractor = xtractor.to(device)
 xtractor.eval()
 
 wav_tensor, sample_rate = torchaudio.load("egs/examples_decode/1272-128104-0000.wav")
+# You have to apply VAD on your own! (Check extract_xvectors.py for an example)
 _, vec = xtractor(wav_tensor.to(device), is_eval=True)
 print(vec.shape)
 ```

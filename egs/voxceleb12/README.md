@@ -9,7 +9,7 @@ The following script can be used to download and prepare the VoxCeleb dataset fo
 ```bash
 python ./dataprep.py --save-path data --download --user USERNAME --password PASSWORD
 python ./dataprep.py --save-path ./data --convert
-python ./dataprep.py --from ./data --make-train-csv # set --filter-dir if your data dir structure differ from the download one (i.e.: voxceleb1/dev/wav/,voxceleb2/dev/wav/)
+python ./dataprep.py --from ./data --make-train-csv # set --filter-dir if your data dir structure differ from the '--download' one (i.e.: voxceleb1/dev/wav/,voxceleb2/dev/wav/)
 ```
 In order to use data augmentation, also run:
 

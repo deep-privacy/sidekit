@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 asv_model="../libri360_train/model/best_test_libri_train_clean_360.pt"
+asv_model="../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71"
 
 asv_test=()
 # librispeech
@@ -41,11 +42,12 @@ for asv_row in "${asv_test[@]}"; do
 
         for data_dir in "$enroll" "$trial"; do
 
-          \rm -rf ./data/$data_dir/x_vector.scp || true
+          # \rm -rf ./data/$data_dir/x_vector.scp || true
 
           if [[ ! -f ./data/$data_dir/x_vector.scp ]]; then
             >&2 echo -e "Extracting x-vectors of $data_dir"
             extract_xvectors.py \
+              --vad \
               --model $asv_model \
               --wav-scp ./data/$data_dir/wav.scp \
               --out-scp ./data/$data_dir/x_vector.scp || exit 1

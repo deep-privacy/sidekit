@@ -4,16 +4,16 @@
 # General options
 data_path: /
 data_file_extension: .flac
-dataset_csv: list/libri.csv
+dataset_csv: list/libri_vad.csv
 
 sample_rate: 16000
 
 validation_ratio: 0.02
-batch_size: 64
+batch_size: 120
 
 # Training set
 train:
-    duration: 3.
+    duration: 2.
     chunk_per_segment: -1
     overlap: 3.
 
@@ -22,7 +22,7 @@ train:
         samples_per_speaker: 100
         augmentation_replica: 1
 
-    transform_number: 1
+    transform_number: 3
 
     transformation:
         pipeline: add_reverb,add_noise,filtering,phone_filtering,codec

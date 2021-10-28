@@ -1,3 +1,6 @@
+import warnings
+warnings.simplefilter("ignore", UserWarning)
+
 import torch
 import torchaudio
 from sidekit.nnet.xvector import Xtractor
@@ -6,6 +9,7 @@ import os
 import io
 import argparse
 import subprocess
+import json
 
 import kaldiio
 import soundfile
@@ -84,22 +88,59 @@ def load_model(model_path, device):
     return xtractor
 
 @torch.no_grad()
-def main(xtractor, kaldi_wav_scp, out_file, device):
+def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window, min_silence_samples):
     device = torch.device(device)
 
     utt2wav = read_wav_scp(kaldi_wav_scp)
     out_ark = os.path.realpath(os.path.join(os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]))
 
+    if vad:
+        model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad:a345715',
+                                      model='silero_vad_mini')
+
+        (get_speech_ts,
+         get_speech_ts_adaptive,
+         _,
+         read_audio,
+         _,
+         _,
+         collect_chunks) = utils
+
+        vad_cache = os.path.splitext(out_file)[0] + "_vad.json"
+        cache_speech_timestamps = {}
+        if os.path.isfile(vad_cache):
+            with open(vad_cache, 'r') as vad_file:
+                cache_speech_timestamps = json.load(vad_file)
+
+
     with kaldiio.WriteHelper(f'ark,scp:{out_ark}.ark,{os.path.realpath(out_file)}') as writer:
         for key, wav in utt2wav.items():
             signal = prepare(wav)
+            if vad:
+                if key in cache_speech_timestamps:
+                    speech_timestamps = cache_speech_timestamps[key]
+                else:
+                    speech_timestamps = get_speech_ts_adaptive(signal, model,
+                                                               step=500,
+                                                               num_samples_per_window=num_samples_per_window,
+                                                               min_silence_samples=min_silence_samples)
+                cache_speech_timestamps[key] = speech_timestamps
+                signal = collect_chunks(speech_timestamps, signal)
+
             signal = signal.to(device)
             _, vec = xtractor(signal, is_eval=True)
             writer(key, vec.detach().cpu().numpy())
 
+        if not os.path.isfile(vad_cache):
+            with open(vad_cache, "w") as vad_file:
+                json.dump(cache_speech_timestamps, vad_file)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract the x-vectors given a sidekit model")
     parser.add_argument("--model", type=str, help="SideKit model", required=True)
+    parser.add_argument("--vad", action='store_true', help="Apply vad before extracting the x-vector")
+    parser.add_argument("--vad-num-samples-per-window", type=int, default=2000, help="Number of samples in each window, (2000 -> 125ms) per window. Check https://github.com/snakers4/silero-vad for more info")
+    parser.add_argument("--vad-min-silence-samples", type=int, default=2000, help="Minimum silence duration in samples between to separate speech chunks, (2000). Check https://github.com/snakers4/silero-vad for more info")
     parser.add_argument("--wav-scp", type=str, required=True)
     parser.add_argument("--out-scp", type=str, required=True)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inference")
@@ -113,4 +154,4 @@ if __name__ == '__main__':
     if args.device == "cuda":
         assert torch.cuda.is_available(), "CUDA is not available, check configuration or run on cpu (--device cpu)"
     xtractor = load_model(args.model, args.device)
-    main(xtractor, args.wav_scp, args.out_scp, args.device)
+    main(xtractor, args.wav_scp, args.out_scp, args.device, args.vad, args.vad_num_samples_per_window, args.vad_min_silence_samples)
