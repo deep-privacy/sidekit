@@ -36,7 +36,7 @@ cd egs/examples_decode
 
 # extract and store the x-vectors in a scp,ark file
 extract_xvectors.py --model ../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71 \
-        --wav-scp ./wav_example.scp --out-scp ./x-vector.scp # the "--vad" flag can be use to remove non speech
+        --wav-scp ./wav_example.scp --out-scp ./x-vector.scp # the "--vad" flag can be used to remove non speech
 ```
 
 #### For Python
