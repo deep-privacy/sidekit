@@ -95,6 +95,9 @@ def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window,
     out_ark = os.path.realpath(os.path.join(os.path.dirname(out_file), os.path.splitext(os.path.basename(out_file))[0]))
 
     if vad:
+        torch.set_num_threads(1) # faster vad on cpu
+        torch.backends.quantized.engine = 'qnnpack' # compatibility
+
         model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad:a345715',
                                       model='silero_vad_mini')
 

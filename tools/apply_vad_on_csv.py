@@ -12,7 +12,7 @@ import torch.multiprocessing as mp
 from tqdm import tqdm
 from argparse import ArgumentParser
 
-torch.set_num_threads(1) # somehow faster
+torch.set_num_threads(1) # faster vad on cpu
 torch.backends.quantized.engine = 'qnnpack' # compatibility
 
 def main(df, out_csv, out_audio_dir, audio_dir, extension_name, nj, num_samples_per_window, min_silence_samples):
