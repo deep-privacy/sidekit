@@ -4,13 +4,17 @@ from tabulate import tabulate
 
 def main():
     results_path_dict = OrderedDict(
-        kaldi="vpc2020/results_kaldi.txt",
-        sidekit_voxceleb="vpc2020/results.txt",
-        sidekit_librispeech="vpc2020/results_finetune_model2.txt"
+        VPC2020_libri={"display": "VPC 2020 with Kaldi\nTrained on Libri-train-clean-360", "file_path": "results_vpc2020.txt"},
+        sidekit_vox_aug={"display": "VPC 2020 with Sidekit\nTrained on Voxceleb12 + Data augmentation", "file_path": "results.txt"},
+        sidekit_scratch_libri_aug={"display": "VPC 2020 with Sidekit\nTrained on Libri-train-clean-360 + Data augmentation\nTraining duration : 10h07", "file_path": "results_scratch_aug.txt"},
+        sidekit_transfer_vox_libri_aug={"display": "VPC 2020 with Sidekit\nTrained on Voxceleb12, transfer learning on Libri-train-clean-360 + Data augmentation\nTraining duration : 14h54", "file_path": "results_transfer_aug.txt"}
     )
 
     results = OrderedDict() # Key = task, value = [[test name, EER, Cllr, Linkability]]
-    for test_name, file_path in results_path_dict.items():
+    display_tab_column_name = ["Dataset"]
+    for test_name, test_data in results_path_dict.items():
+        text_test_display = test_data["display"]
+        file_path = test_data["file_path"]
         print("New result file : ", test_name, " - ", file_path)
 
         with open(file_path, "r") as result_file:
@@ -58,10 +62,7 @@ def main():
                 else:
                     linkability_val = "N/A"
                 results[dataset]["Linkability"].append(linkability_val)
-
-    tab_column_name = ["Dataset"]
-    for res_path_key in results_path_dict.keys():
-        tab_column_name.append(res_path_key)
+        display_tab_column_name.append(text_test_display)
 
     tab_rows = []
     display_list = ["EER"]
@@ -72,7 +73,7 @@ def main():
                 new_row.extend(data[res_name])
                 tab_rows.append(new_row)
 
-    compare_res_table = tabulate(tab_rows,headers=tab_column_name, tablefmt="orgtbl")
+    compare_res_table = tabulate(tab_rows, headers=display_tab_column_name, tablefmt="orgtbl")
     print(compare_res_table)
     out_file = open("compare_res.txt", "w")
     out_file.write(compare_res_table)
