@@ -64,6 +64,7 @@ xtractor = xtractor.to(device)
 xtractor.eval()
 
 wav_tensor, sample_rate = torchaudio.load("egs/examples_decode/1272-128104-0000.wav")
+assert sample_rate == 16000 # same as in Sidekit training
 # You have to apply VAD on your own! (Check extract_xvectors.py for an example)
 _, vec = xtractor(wav_tensor.to(device), is_eval=True)
 print(vec.shape)
