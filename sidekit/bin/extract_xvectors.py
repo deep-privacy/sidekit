@@ -123,7 +123,7 @@ def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window,
                 signal_for_vad = signal
                 if sr != 16000: # SR for vad
                     signal_for_vad = torchaudio.transforms.Resample(orig_freq=sr,
-                                                   new_freq=1600)(signal)
+                                                   new_freq=16000)(signal)
                     sr = 16000
                 if key in cache_speech_timestamps:
                     speech_timestamps = cache_speech_timestamps[key]
