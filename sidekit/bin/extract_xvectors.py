@@ -60,15 +60,15 @@ def prepare(wav):
                 shell=True,
                 stderr=devnull
             )
-            sample, _ = soundfile.read(
+            sample, sr = soundfile.read(
                 io.BytesIO(wav_read_process.communicate()[0]),
             )
         except Exception as e:
             raise IOError("Error processing wav file: {}\n{}".format(wav, e))
     else:
-        sample, _ = soundfile.read(wav)
+        sample, sr = soundfile.read(wav)
     feats_torch = torch.tensor(sample, dtype=torch.float32, requires_grad=False)
-    return feats_torch
+    return feats_torch, sr
 
 def load_model(model_path, device):
     device = torch.device(device)
@@ -85,10 +85,10 @@ def load_model(model_path, device):
     xtractor.load_state_dict(model_config["model_state_dict"], strict=True)
     xtractor = xtractor.to(device)
     xtractor.eval()
-    return xtractor
+    return xtractor, model_config
 
 @torch.no_grad()
-def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window, min_silence_samples):
+def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window, min_silence_samples, model_sample_rate):
     device = torch.device(device)
 
     utt2wav = read_wav_scp(kaldi_wav_scp)
@@ -118,19 +118,29 @@ def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window,
 
     with kaldiio.WriteHelper(f'ark,scp:{out_ark}.ark,{os.path.realpath(out_file)}') as writer:
         for key, wav in utt2wav.items():
-            signal = prepare(wav)
+            signal, sr = prepare(wav)
             if vad:
+                signal_for_vad = signal
+                if sr != model_sample_rate:
+                    signal_for_vad = torchaudio.transforms.Resample(orig_freq=sr,
+                                                   new_freq=1600)(signal)
                 if key in cache_speech_timestamps:
                     speech_timestamps = cache_speech_timestamps[key]
                 else:
-                    speech_timestamps = get_speech_ts_adaptive(signal, model,
+                    speech_timestamps = get_speech_ts_adaptive(signal_for_vad.mean(dim=0, keepdim=True),
+                                                               model,
                                                                step=500,
                                                                num_samples_per_window=num_samples_per_window,
                                                                min_silence_samples=min_silence_samples)
+                    if len(speech_timestamps) == 0:
+                        speech_timestamps = [{"start":0, "end":len(signal)}]
+                signal = collect_chunks(speech_timestamps, signal_for_vad)
                 cache_speech_timestamps[key] = speech_timestamps
-                signal = collect_chunks(speech_timestamps, signal)
 
             signal = signal.to(device)
+            if sr != model_sample_rate:
+                signal = torchaudio.transforms.Resample(orig_freq=sr,
+                                               new_freq=model_sample_rate)(signal)
             _, vec = xtractor(signal, is_eval=True)
             writer(key, vec.detach().cpu().numpy())
 
@@ -141,9 +151,10 @@ def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract the x-vectors given a sidekit model")
     parser.add_argument("--model", type=str, help="SideKit model", required=True)
+    parser.add_argument("--sample-rate", type=int, help="Must match SideKit SR model", default=16000)
     parser.add_argument("--vad", action='store_true', help="Apply vad before extracting the x-vector")
     parser.add_argument("--vad-num-samples-per-window", type=int, default=2000, help="Number of samples in each window, (2000 -> 125ms) per window. Check https://github.com/snakers4/silero-vad for more info")
-    parser.add_argument("--vad-min-silence-samples", type=int, default=2000, help="Minimum silence duration in samples between to separate speech chunks, (2000). Check https://github.com/snakers4/silero-vad for more info")
+    parser.add_argument("--vad-min-silence-samples", type=int, default=1500, help="Minimum silence duration in samples between to separate speech chunks, (1500). Check https://github.com/snakers4/silero-vad for more info")
     parser.add_argument("--wav-scp", type=str, required=True)
     parser.add_argument("--out-scp", type=str, required=True)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inference")
@@ -156,5 +167,5 @@ if __name__ == '__main__':
     args.device = args.device.strip().lower()
     if args.device == "cuda":
         assert torch.cuda.is_available(), "CUDA is not available, check configuration or run on cpu (--device cpu)"
-    xtractor = load_model(args.model, args.device)
-    main(xtractor, args.wav_scp, args.out_scp, args.device, args.vad, args.vad_num_samples_per_window, args.vad_min_silence_samples)
+    xtractor, model_config = load_model(args.model, args.device)
+    main(xtractor, args.wav_scp, args.out_scp, args.device, args.vad, args.vad_num_samples_per_window, args.vad_min_silence_samples, args.sample_rate)

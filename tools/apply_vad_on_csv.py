@@ -31,26 +31,26 @@ def main(df, out_csv, out_audio_dir, audio_dir, extension_name, nj, num_samples_
 
         out_cvs_list = []
         for i, row in iter:
-            try:
-                wav = read_audio(audio_dir + "/" + row["file_id"] + "." + extension_name)
-                # Experimental Adaptive method, algorithm selects thresholds itself
-                speech_timestamps = get_speech_ts_adaptive(wav, model,
-                                                           step=500,
-                                                           num_samples_per_window=num_samples_per_window,
-                                                           min_silence_samples=min_silence_samples)
+            # Resample done in read_audio (if required) to match VAD 16kH
+            wav = read_audio(audio_dir + "/" + row["file_id"] + "." + extension_name)
+            # Experimental Adaptive method, algorithm selects thresholds itself
+            speech_timestamps = get_speech_ts_adaptive(wav, model,
+                                                       step=500,
+                                                       num_samples_per_window=num_samples_per_window,
+                                                       min_silence_samples=min_silence_samples)
 
-                if log_one:
-                    print("Sample of one VAD application:", row["file_id"] + "." + extension_name, speech_timestamps)
-                    log_one = False
+            if log_one:
+                print("Sample of one VAD application:", row["file_id"] + "." + extension_name, speech_timestamps)
+                log_one = False
 
-                row["file_id"] = os.path.realpath(f"{out_audio_dir}/vad_{os.path.basename(row['file_id'])}")
-                #  # merge all speech chunks to one audio
+            row["file_id"] = os.path.realpath(f"{out_audio_dir}/vad_{os.path.basename(row['file_id'])}")
+            # merge all speech chunks to one audio
+            if len(speech_timestamps) > 0:
                 vad_wav = collect_chunks(speech_timestamps, wav)
-                row["duration"] = len(vad_wav) / 16000
-                save_audio(row["file_id"]+"."+extension_name, vad_wav, 16000)
-
-            except Exception:
-                print(f"failed to process: {os.path.basename(row['file_id'])}, not applying vad for this file")
+            else:
+                vad_wav = wav
+            row["duration"] = len(vad_wav) / 16000
+            save_audio(row["file_id"]+"."+extension_name, vad_wav, 16000)
 
             out_cvs_list.append(row)
 
@@ -89,8 +89,8 @@ if __name__ == "__main__":
     parser.add_argument("--nj", type=int, default=8)
     parser.add_argument("--num-samples-per-window", type=int, default=2000,
                         help="Number of samples in each window, (2000 -> 125ms) per window. Check https://github.com/snakers4/silero-vad for more info")
-    parser.add_argument("--min-silence-samples", type=int, default=2000,
-                        help="Minimum silence duration in samples between to separate speech chunks, (2000). Check https://github.com/snakers4/silero-vad for more info")
+    parser.add_argument("--min-silence-samples", type=int, default=1500,
+                        help="Minimum silence duration in samples between to separate speech chunks, (1500). Check https://github.com/snakers4/silero-vad for more info")
     args = parser.parse_args()
 
     assert os.path.isfile(args.in_csv), "NO SUCH FILE: %s" % args.in_csv
