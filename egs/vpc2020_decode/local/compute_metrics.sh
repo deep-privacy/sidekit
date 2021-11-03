@@ -36,14 +36,20 @@ for common in '' '_common'; do
   done
 done
 
+# Cleanup
+for asv_row in "${asv_test[@]}"; do
+    while IFS=',' read -r enroll trial; do
+        for data_dir in "$enroll" "$trial"; do
+          \rm ./data/$data_dir/x_vector.scp || true
+        done
+    done <<< "$asv_row"
+done
+
 for asv_row in "${asv_test[@]}"; do
     while IFS=',' read -r enroll trial; do
         printf 'ASV: %s\n' "$enroll - $trial"
 
         for data_dir in "$enroll" "$trial"; do
-
-          # \rm -rf ./data/$data_dir/x_vector.scp || true
-
           if [[ ! -f ./data/$data_dir/x_vector.scp ]]; then
             >&2 echo -e "Extracting x-vectors of $data_dir"
             extract_xvectors.py \
