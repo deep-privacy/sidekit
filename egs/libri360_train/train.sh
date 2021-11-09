@@ -10,8 +10,12 @@ cd ../..
 . ./env.sh
 cd -
 
+dataset_file="cfg/Librispeech.yaml"
+model_file="cfg/model.yaml"
+training_file="cfg/training.yaml"
+
 python3 -m torch.distributed.launch \
        --nproc_per_node=$NUM_GPUS_PER_NODE \
        --nnodes=$NUM_NODES \
        --node_rank $NODE_RANK \
-       train_xtractor.py --dataset cfg/Librispeech.yaml
+       train_xtractor.py --dataset $dataset_file --model $model_file --training $training_file

@@ -8,12 +8,12 @@ numpy_seed: 42
 random_seed: 42
 deterministic: false
 
-epochs: 1000
+epochs: 150
 lr: 0.001
 patience: 100
 
 multi_gpu: true
-num_cpu: 8
+num_cpu: 16
 
 mixed_precision: true
 clipping: false
@@ -35,6 +35,6 @@ log_interval: 10
 validation_frequency: 1
 
 # Save options
-tmp_model_name: model/tmp_test_libri_train_clean_360.pt
-best_model_name: model/best_test_libri_train_clean_360.pt
+tmp_model_name: model/tmp_libri_train_clean_360_transfer_noaug.pt
+best_model_name: model/best_libri_train_clean_360_transfer_noaug.pt
 checkpoint_frequency:
