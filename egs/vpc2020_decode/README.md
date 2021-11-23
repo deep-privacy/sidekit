@@ -18,7 +18,7 @@ local/create_data_dir.sh
 local/compute_metrics.sh > results.txt
 ```
 
-### Comparison among multiple compute metrics results
+### Comparison among several compute metrics results
 ```bash
 python local/compare_results.py
 ```
