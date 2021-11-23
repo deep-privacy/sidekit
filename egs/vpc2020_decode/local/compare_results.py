@@ -14,21 +14,19 @@ def main():
     # First file in this dict is the reference for value comparison between tests (variation percentage displayed is variation compared to first file result)
     results_path_dict = OrderedDict(
         VPC2020_libri={"display": "VPC 2020 with Kaldi\nTrain : Libri-train-clean-360", "file_path": "results_vpc2020.txt"},
-        VPC2020_libri_2={"display": "TEST",
-                       "file_path": "results_vpc2020.txt"}
-        # #sidekit_vox_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12 - Augmentation", "file_path": "results.txt"},
-        # sidekit_scratch_libri_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 - Augmentation\nTraining duration : 10h07", "file_path": "results_scratch_aug.txt"},
-        # #sidekit_transfer_vox_libri_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 - Augmentation\nTraining duration : 14h54", "file_path": "results_transfer_aug.txt"},
-        # sidekit_scratch_libri_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 - No augmentation\nTraining duration : 7h41", "file_path": "results_scratch_noaug.txt"},
-        # #sidekit_transfer_vox_libri_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 - No augmentation\nTraining duration : 6h47", "file_path": "results_transfer_noaug.txt"},
-        # sidekit_anon_scratch_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360_anon - Augmentation", "file_path": "results_anon_spk_scratch_aug.txt"},
-        # sidekit_anon_scratch_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360_anon - No augmentation", "file_path": "results_anon_spk_scratch_no_aug.txt"},
-        # #sidekit_anon_transfer_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360_anon - Augmentation", "file_path": "results_anon_spk_transfer_aug.txt"},
-        # #sidekit_anon_transfer_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360_anon - No augmentation", "file_path": "results_anon_spk_transfer_no_aug.txt"},
-        # sidekit_vad_scratch_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 with VAD - Augmentation", "file_path": "results_vad_scratch_aug.txt"},
-        # sidekit_vad_scratch_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 with VAD - No augmentation", "file_path": "results_vad_scratch_no_aug.txt"},
-        # #sidekit_vad_transfer_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 with VAD - Augmentation", "file_path": "results_vad_transfer_aug.txt"},
-        # #sidekit_vad_transfer_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 with VAD - No augmentation", "file_path": "results_vad_transfer_no_aug.txt"},
+        #sidekit_vox_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12 - Augmentation", "file_path": "results.txt"},
+        sidekit_scratch_libri_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 - Augmentation\nTraining duration : 10h07", "file_path": "results_scratch_aug.txt"},
+        #sidekit_transfer_vox_libri_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 - Augmentation\nTraining duration : 14h54", "file_path": "results_transfer_aug.txt"},
+        sidekit_scratch_libri_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 - No augmentation\nTraining duration : 7h41", "file_path": "results_scratch_noaug.txt"},
+        #sidekit_transfer_vox_libri_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 - No augmentation\nTraining duration : 6h47", "file_path": "results_transfer_noaug.txt"},
+        sidekit_anon_scratch_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360_anon - Augmentation", "file_path": "results_anon_spk_scratch_aug.txt"},
+        sidekit_anon_scratch_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360_anon - No augmentation", "file_path": "results_anon_spk_scratch_no_aug.txt"},
+        #sidekit_anon_transfer_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360_anon - Augmentation", "file_path": "results_anon_spk_transfer_aug.txt"},
+        #sidekit_anon_transfer_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360_anon - No augmentation", "file_path": "results_anon_spk_transfer_no_aug.txt"},
+        sidekit_vad_scratch_aug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 with VAD - Augmentation", "file_path": "results_vad_scratch_aug.txt"},
+        sidekit_vad_scratch_noaug={"display": "VPC 2020 with Sidekit\nTrain : Libri-train-clean-360 with VAD - No augmentation", "file_path": "results_vad_scratch_no_aug.txt"},
+        #sidekit_vad_transfer_aug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 with VAD - Augmentation", "file_path": "results_vad_transfer_aug.txt"},
+        #sidekit_vad_transfer_noaug={"display": "VPC 2020 with Sidekit\nTrain : Voxceleb12, transfer Libri-train-clean-360 with VAD - No augmentation", "file_path": "results_vad_transfer_no_aug.txt"},
 
     )
     # Metrics to display on the final table. Leave empty to display all metrics
