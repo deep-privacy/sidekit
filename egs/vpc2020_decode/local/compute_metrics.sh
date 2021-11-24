@@ -36,11 +36,15 @@ for common in '' '_common'; do
   done
 done
 
+model_filename=$(basename $asv_model)
+out_file_suffix=${model_filename%.pt}
+
+
 # Cleanup
 for asv_row in "${asv_test[@]}"; do
     while IFS=',' read -r enroll trial; do
         for data_dir in "$enroll" "$trial"; do
-          \rm ./data/$data_dir/x_vector.scp || true
+          \rm ./data/$data_dir/x_vector_$out_file_suffix.scp || true
         done
     done <<< "$asv_row"
 done
@@ -50,27 +54,27 @@ for asv_row in "${asv_test[@]}"; do
         printf 'ASV: %s\n' "$enroll - $trial"
 
         for data_dir in "$enroll" "$trial"; do
-          if [[ ! -f ./data/$data_dir/x_vector.scp ]]; then
+          if [[ ! -f ./data/$data_dir/x_vector_$out_file_suffix.scp ]]; then
             >&2 echo -e "Extracting x-vectors of $data_dir"
             extract_xvectors.py \
               --vad \
               --model $asv_model \
               --wav-scp ./data/$data_dir/wav.scp \
-              --out-scp ./data/$data_dir/x_vector.scp || exit 1
+              --out-scp ./data/$data_dir/x_vector_$out_file_suffix.scp || exit 1
           fi
-          if [[ ! "$(wc -l < ./data/$data_dir/wav.scp)" -eq "$(wc -l < ./data/$data_dir/x_vector.scp)" ]]; then >&2 echo -e "\nWarning: Something went wrong during the x-vector extraction!\nPlease redo the extraction:\n\trm ./data/$data_dir/x_vector.scp\n" && exit 2; fi
+          if [[ ! "$(wc -l < ./data/$data_dir/wav.scp)" -eq "$(wc -l < ./data/$data_dir/x_vector_$out_file_suffix.scp)" ]]; then >&2 echo -e "\nWarning: Something went wrong during the x-vector extraction!\nPlease redo the extraction:\n\trm ./data/$data_dir/x_vector_$out_file_suffix.scp\n" && exit 2; fi
         done
 
         compute_spk_cosine.py \
           ./data/$trial/trials \
           ./data/$enroll/utt2spk \
-          ./data/$trial/x_vector.scp \
-          ./data/$enroll/x_vector.scp \
-          ./data/$trial/cosine_score_$enroll.txt || exit 1
+          ./data/$trial/x_vector_$out_file_suffix.scp \
+          ./data/$enroll/x_vector_$out_file_suffix.scp \
+          ./data/$trial/cosine_score_"$enroll"_$out_file_suffix.txt || exit 1
 
         compute_metrics.py \
           -k ./data/$trial/trials \
-          -s ./data/$trial/cosine_score_$enroll.txt || exit 1
+          -s ./data/$trial/cosine_score_"$enroll"_$out_file_suffix.txt || exit 1
 
     done <<< "$asv_row"
 done
