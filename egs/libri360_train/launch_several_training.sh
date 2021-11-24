@@ -76,7 +76,7 @@ done
 # Launch experiments on Grid5000
 oar_out_dir="oarOutDir/"
 mkdir -p $oar_out_dir
-for file in tmp/*.sh; do
+for file in $out_dir/*.sh; do
   chmod 744 $file
   curFilename=$(basename $file)
   oarsub -q production -p "cluster <> 'grimani' and cluster <> 'graphique' and cluster <> 'gruss'" -l /host=1/gpu=2,walltime="24:00:00" \
