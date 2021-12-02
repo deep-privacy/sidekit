@@ -8,11 +8,8 @@ loss:
     aam_s: 30
 
 # Initialize model from file, reset and freeze parts of it
-# initial_model_name: ./model/tmp_half_clr_adam_aam0.2_30_b256_vox12.pt
-initial_model_name: ../../best_halp_clr_adam_aam0.2_30_b256_vox12.pt_epoch71
-#initial_model_name:
-reset_parts: [after_speaker_embedding]
-#reset_parts: []
+initial_model_name:
+reset_parts: []
 freeze_parts: []
 
 # Model can be fastresnet34, resnet34, xvector of custom

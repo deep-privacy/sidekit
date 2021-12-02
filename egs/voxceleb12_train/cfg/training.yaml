@@ -8,12 +8,12 @@ numpy_seed: 42
 random_seed: 42
 deterministic: false
 
-epochs: 150
+epochs: 1000
 lr: 0.001
 patience: 100
 
 multi_gpu: true
-num_cpu: 16
+num_cpu: 6
 
 mixed_precision: true
 clipping: false
@@ -26,8 +26,8 @@ optimizer:
 scheduler:
     type: CyclicLR
     mode: triangular2
-    base_lr: 1.0e-05
-    step_size_up: 3000
+    base_lr: 1.0e-10
+    step_size_up: 40000
 
 # Evaluation options
 compute_test_eer: false
@@ -35,6 +35,6 @@ log_interval: 10
 validation_frequency: 1
 
 # Save options
-tmp_model_name: model/tmp_vox12.pt
-best_model_name: model/best_vox12.pt
+tmp_model_name: model/tmp_vox12_ori.pt
+best_model_name: model/best_vox12_ori.pt
 checkpoint_frequency:

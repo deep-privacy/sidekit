@@ -18,4 +18,4 @@ python3 -m torch.distributed.launch \
        --nproc_per_node=$NUM_GPUS_PER_NODE \
        --nnodes=$NUM_NODES \
        --node_rank $NODE_RANK \
-       train_xtractor.py --dataset $dataset_file --model $model_file --training $training_file
+       ../../tools/train_xtractor.py --dataset $dataset_file --model $model_file --training $training_file

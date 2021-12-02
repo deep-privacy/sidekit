@@ -9,7 +9,7 @@ dataset_csv: list/voxceleb12.csv
 sample_rate: 16000
 
 validation_ratio: 0.02
-batch_size: 100
+batch_size: 512
 
 # Training set
 train:
