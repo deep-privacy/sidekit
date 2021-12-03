@@ -4,7 +4,7 @@
 # General options
 data_path: /
 data_file_extension: .flac
-dataset_csv: list/libri_vad.csv
+dataset_csv: list/libri_train_clean_360.csv
 
 sample_rate: 16000
 
