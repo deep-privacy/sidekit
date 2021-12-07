@@ -29,7 +29,8 @@ def main():
         with open(reco2dir_path, "r") as reco2dur_file:
             for line in reco2dur_file:
                 split_line = line.split(" ")
-                reco2dur_dict[split_line[0]] = split_line[1].replace("\n", "")
+                spk = split_line[0].split("-")[0]  # Remove sub-id of speaker if exists (useful for librispeech dataset)
+                reco2dur_dict[spk] = split_line[1].replace("\n", "")
 
     spk_list = []
     out_csv_file = open(out_csv_path, "w", newline="")
@@ -63,9 +64,14 @@ def main():
             # Scp file without command inside
             file_path = split_line[1]
         else:
-            # Scp file with command inside
-            file_path = split_line[2]
-        file_path = os.path.realpath(file_path)
+            # Scp file with command inside.
+            # Read all split to find text with '/' indicating it's a path
+            file_path = ""
+            for word in split_line:
+                if '/' in word:
+                    file_path = word
+            if file_path == "":
+                raise FileNotFoundError("No filepath found in line : ", line)
         spk_id = utt_id.split("-")[0]
         if spk_id not in spk_list:
             spk_list.append(spk_id)
@@ -103,7 +109,7 @@ def calculate_duration(file_path):
         audio_info = torchaudio.info(file_path)
         duration = audio_info.num_frames / audio_info.sample_rate
     except Exception:
-        print("failed to load info of:", file_path)
+        print("Failed to load info of:", file_path)
         duration = 0
 
     return duration

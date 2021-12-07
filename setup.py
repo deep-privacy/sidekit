@@ -33,6 +33,7 @@ setup(
         "sidekit/bin/extract_xvectors.py",
         "tools/compute_metrics.py",
         "tools/apply_vad_on_csv.py",
-        "tools/train_xtractor.py"
+        "tools/train_xtractor.py",
+        "tools/sidekit_csv_from_kaldi.py"
     ],
 )
