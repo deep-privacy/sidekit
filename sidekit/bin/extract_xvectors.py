@@ -13,6 +13,7 @@ import json
 
 import kaldiio
 import soundfile
+import numpy as np
 
 def read_wav_scp(wav_scp):
     """Reads wav.scp file and returns a dictionary
@@ -88,7 +89,7 @@ def load_model(model_path, device):
     return xtractor, model_config
 
 @torch.no_grad()
-def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window, min_silence_samples, model_sample_rate):
+def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window, min_silence_samples, model_sample_rate, out_file_spk, spk2utt_file):
     device = torch.device(device)
 
     utt2wav = read_wav_scp(kaldi_wav_scp)
@@ -149,6 +150,29 @@ def main(xtractor, kaldi_wav_scp, out_file, device, vad, num_samples_per_window,
             with open(vad_cache, "w") as vad_file:
                 json.dump(cache_speech_timestamps, vad_file)
 
+    # Compute mean x-vector for each speaker
+    if out_file_spk:
+        # Read spk2utt file
+        spk2utt = {}
+        with open(spk2utt_file) as spk2utt_f:
+            for line in spk2utt_f:
+                lns = line.strip().split()
+                spk2utt[lns[0]] = lns[1:]
+
+        # Read xvector scp out file generated above
+        with kaldiio.ReadHelper(f'scp:{out_file}') as reader:
+            utt2embd = {utt: embd for utt, embd in reader}
+
+        # Compute mean x-vector
+        out_ark_spk = os.path.realpath(os.path.join(os.path.dirname(out_file_spk), os.path.splitext(os.path.basename(out_file_spk))[0]))
+        with kaldiio.WriteHelper(f'ark,scp:{out_ark_spk}.ark,{os.path.realpath(out_file_spk)}') as writer:
+            for spk, uttrs in spk2utt.items():
+                mean = np.mean([utt2embd[utt] for utt in uttrs], axis=0)
+                norm = np.linalg.norm(mean, ord=2)
+                mean /= norm
+                writer(spk, mean)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract the x-vectors given a sidekit model")
     parser.add_argument("--model", type=str, help="SideKit model", required=True)
@@ -158,6 +182,8 @@ if __name__ == '__main__':
     parser.add_argument("--vad-min-silence-samples", type=int, default=1500, help="Minimum silence duration in samples between to separate speech chunks, (1500). Check https://github.com/snakers4/silero-vad for more info")
     parser.add_argument("--wav-scp", type=str, required=True)
     parser.add_argument("--out-scp", type=str, required=True)
+    parser.add_argument("--out-spk-scp", type=str, default="", help="Path to the scp file containing x-vector per speaker. Leave empty to not compute mean x-vector")
+    parser.add_argument("--spk2utt-file", type=str, default="", help="Path to the spk2utt file. Required if out-spk-scp parameter filled")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu", type=str, help="The device (cpu or cuda:0) to run the inference")
     args = parser.parse_args()
 
@@ -168,5 +194,8 @@ if __name__ == '__main__':
     args.device = args.device.strip().lower()
     if args.device == "cuda":
         assert torch.cuda.is_available(), "CUDA is not available, check configuration or run on cpu (--device cpu)"
+    if args.out_spk_scp:
+        assert os.path.isdir(os.path.dirname(args.out_spk_scp)), "NO SUCH DIRECTORY: %s" % args.out_spk_scp
+        assert os.path.isfile(args.spk2utt_file), "NO SUCH FILE: %s" % args.spk2utt_file
     xtractor, model_config = load_model(args.model, args.device)
-    main(xtractor, args.wav_scp, args.out_scp, args.device, args.vad, args.vad_num_samples_per_window, args.vad_min_silence_samples, args.sample_rate)
+    main(xtractor, args.wav_scp, args.out_scp, args.device, args.vad, args.vad_num_samples_per_window, args.vad_min_silence_samples, args.sample_rate, args.out_spk_scp, args.spk2utt_file)
