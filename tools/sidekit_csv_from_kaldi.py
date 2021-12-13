@@ -20,17 +20,17 @@ def main():
     with open(os.path.join(kaldi_data_path, "spk2gender"), "r") as spk2gender_file:
         for line in spk2gender_file:
             split_line = line.split(" ")
-            spk2gender_dict[split_line[0]] = split_line[1].replace("\n", "")
+            spk = split_line[0].split("-")[0]  # Remove sub-id of speaker if exists (useful for librispeech dataset)
+            spk2gender_dict[spk] = split_line[1].replace("\n", "")
 
     # Read reco2dur file if exists
-    reco2dur_dict = {}
-    reco2dir_path = os.path.join(kaldi_data_path, "reco2dur")
-    if os.path.exists(reco2dir_path):
-        with open(reco2dir_path, "r") as reco2dur_file:
-            for line in reco2dur_file:
+    utt2dur_dict = {}
+    utt2dir_path = os.path.join(kaldi_data_path, "utt2dur")
+    if os.path.exists(utt2dir_path):
+        with open(utt2dir_path, "r") as utt2dur_file:
+            for line in utt2dur_file:
                 split_line = line.split(" ")
-                spk = split_line[0].split("-")[0]  # Remove sub-id of speaker if exists (useful for librispeech dataset)
-                reco2dur_dict[spk] = split_line[1].replace("\n", "")
+                utt2dur_dict[split_line[0]] = split_line[1].replace("\n", "")
 
     spk_list = []
     out_csv_file = open(out_csv_path, "w", newline="")
@@ -78,9 +78,9 @@ def main():
         spk_idx = spk_list.index(spk_id)
 
         start = 0
-        if len(reco2dur_dict) > 0:
+        if len(utt2dur_dict) > 0:
             # Load duration from existing reco2dur file
-            duration = reco2dur_dict[utt_id]
+            duration = utt2dur_dict[utt_id]
         else:
             # No reco2dur file, loading duration with torchaudio
             duration = calculate_duration(file_path)
