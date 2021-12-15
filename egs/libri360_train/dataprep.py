@@ -40,6 +40,12 @@ parser.add_argument(
     help="Download and extract augmentation datasets",
 )
 parser.add_argument(
+    "--augment-conf-file",
+    dest="augment_conf_file",
+    default="list/augment.txt",
+    help="Path to the configuration file for augmentation data",
+)
+parser.add_argument(
     "--make-train-csv",
     dest="make_train_csv",
     action="store_true",
@@ -397,15 +403,13 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_path):
         raise ValueError(f"Target directory '{args.save_path}' does not exist.")
 
-    f = open("list/files.txt", "r")
-    files = f.readlines()
-    f.close()
 
-    f = open("list/augment.txt", "r")
-    augfiles = f.readlines()
-    f.close()
 
     if args.augment:
+        f = open(args.augment_conf_file, "r")
+        augfiles = f.readlines()
+        f.close()
+
         download(args, augfiles)
         #  part_extract(args,os.path.join(args.save_path,'rirs_noises.zip'),['RIRS_NOISES/simulated_rirs/mediumroom','RIRS_NOISES/simulated_rirs/smallroom'])
         part_extract(
@@ -415,6 +419,10 @@ if __name__ == "__main__":
         split_musan(args)
 
     if args.download:
+        f = open("list/files.txt", "r")
+        files = f.readlines()
+        f.close()
+
         download(args, files)
         for line in files:
             outfile = line.split()[0].split("/")[-1]
