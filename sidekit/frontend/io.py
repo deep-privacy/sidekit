@@ -99,6 +99,12 @@ def write_pcm(data, output_file_name):
 
 @check_path_existance
 def write_wav(data, output_file_name, fs):
+    """Write signal to single channel WAV 16 bits
+    
+    :param data: audio signal to write
+    :param output_file_name: name of the file to write
+    :param fs: sample rate in Hz
+    """
     if data.dtype != numpy.int16:
         if data.dtype == numpy.float32:
             data /= numpy.abs(data).max()
@@ -980,6 +986,7 @@ def read_htk_segment(input_file_name,
         m = numpy.r_[numpy.repeat(m[[0]], s-start, axis=0), m, numpy.repeat(m[[-1]], stop-e, axis=0)]
     return m.astype(numpy.float32)
 
+
 def _add_dataset_header(fh,
                         dataset_id,
                         _min_val,
@@ -988,6 +995,12 @@ def _add_dataset_header(fh,
     """
     Create a dataset in the HDF5 file and write the data
     after compressing float to int
+
+    :param fh: file handler in HDF5 format
+    :param dataset_id: name of the new dataset to create
+    :param _min_val: minimum value in the dataset (used for compression)
+    :param _range: range of the values in the dataset (used for compression)
+    :param _header: header of the dataset
     """
     _c_header = (_header - _min_val) / _range
     numpy.clip(_c_header, 0., 1.)
@@ -1004,6 +1017,7 @@ def _add_dataset_header(fh,
                       compression="gzip",
                       fletcher32=True)
 
+
 def _add_percentile_dataset(fh,
                             dataset_id,
                             data):
@@ -1011,6 +1025,10 @@ def _add_percentile_dataset(fh,
     Create the dataset in the HDF5 file, write the data
     compressed in int8 format and the header compressed in
     int format
+
+    :param fh: file handler in HDF5 format
+    :param dataset_id: name of the new dataset to create
+    :param data: data to fill the dataset
     """
     _min_val = data.min()
     _range = data.ptp()
@@ -1044,28 +1062,71 @@ def _add_percentile_dataset(fh,
                       fletcher32=True)
 
 def _read_dataset(h5f, dataset_id):
+    """
+    Read a dataset from HDF5 file
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read
+    :return: the data stored in the dataset
+    """
     data = h5f[dataset_id][()]
     if data.ndim == 1:
         data = data[:, numpy.newaxis]
     return data
 
+
 def _read_segment(h5f, dataset_id, s, e):
+    """
+    Read a sequence of features stored in an HDF5 dataset.
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read from
+    :param s: start index of the sequence to read
+    :param e: end index of the sequence to read
+    :return: the sequence of features in a numpy array format
+    """
     data = h5f[dataset_id][s:e]
     return data
 
+
 def _read_dataset_htk(h5f, dataset_id):
+    """
+    Read a dataset from HDF5 file
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read
+    :return: the sequence of features in a numpy array format
+    """
     (A, B) = h5f[dataset_id + "comp"][()]
     data = (h5f[dataset_id][()] + B) / A
     if data.ndim == 1:
         data = data[:, numpy.newaxis]
     return data
 
+
 def _read_segment_htk(h5f, dataset_id, e, s):
+    """
+    Read a sequence of features stored in an HDF5 dataset written in HTK format
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read from
+    :param s: start index of the sequence to read
+    :param e: end index of the sequence to read
+    :return: the sequence of features in a numpy array format
+    """
     (A, B) = h5f[dataset_id + "comp"][()]
     data = (h5f[dataset_id][s:e, :] + B) / A
     return data
 
+
 def read_dataset_percentile(h5f, dataset_id):
+    """
+    Read a compressed dataset from HDF5 file
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read
+    :return: the sequence of features in a numpy array format
+    """
     # read the header
     (_min_val, _range) = h5f[dataset_id + "_min_range"][()]
     c_header = h5f[dataset_id + "_header"][()]
@@ -1079,7 +1140,17 @@ def read_dataset_percentile(h5f, dataset_id):
     mat3 = (_header[:,[2]] + (_header[:,[3]] - _header[:,[2]]) * (c_data.T - 192) * (1/63)) * (c_data.T > 192)
     return (mat1+mat2+mat3).T
 
+
 def _read_segment_percentile(h5f, dataset_id, s, e):
+    """
+    Read a sequence of features stored in a compressed HDF5 dataset
+
+    :param h5f: file handler in HDF5 format
+    :param dataset_id: name of the dataset to read from
+    :param s: start index of the sequence to read
+    :param e: end index of the sequence to read
+    :return: the sequence of features in a numpy array format
+    """
     # read the header
     (_min_val, _range) = h5f[dataset_id + "_min_range"][()]
     c_header = h5f[dataset_id + "_header"][()]
@@ -1100,6 +1171,25 @@ def _write_show(show,
                 fb, fb_mean, fb_std,
                 bnf, bnf_mean, bnf_std,
                 label):
+    """
+    Write features for a given show in HDF5 format
+
+    :param show: name of the show to write
+    :param fh: file handler in HDF5 format
+    :param cep: cepstral coefficients
+    :param cep_mean: mean vector of the cepstral coefficients
+    :param cep_std: standard deviation vector of the cepstral coefficients
+    :param energy: energy value per frame
+    :param energy_mean: mean of the energy
+    :param energy_std: standard deviation of the energy
+    :param fb: filterbank coefficients
+    :param fb_mean: mean vector of the filterbank coefficients
+    :param fb_std: standard deviation vector of filterbank coefficients
+    :param bnf: bottleneck features
+    :param bnf_mean: mean vector of the bottleneck features
+    :param bnf_std: standard deviation vector of bottleneck features
+    :param label: voice activity detection labels per frame
+    """
     if cep is not None:
         fh.create_dataset(show + '/cep', data=cep.astype('float32'),
                           maxshape=(None, None),
@@ -1161,6 +1251,7 @@ def _write_show(show,
                           compression="gzip",
                           fletcher32=True)
 
+
 def _write_show_htk(show,
                     fh,
                     cep, cep_mean, cep_std,
@@ -1168,6 +1259,24 @@ def _write_show_htk(show,
                     fb, fb_mean, fb_std,
                     bnf, bnf_mean, bnf_std,
                     label):
+    """
+    Write features for a given show in HDF5 and HTK format
+
+    :param fh: file handler in HDF5 format
+    :param cep: cepstral coefficients
+    :param cep_mean: mean vector of the cepstral coefficients
+    :param cep_std: standard deviation vector of the cepstral coefficients
+    :param energy: energy value per frame
+    :param energy_mean: mean of the energy
+    :param energy_std: standard deviation of the energy
+    :param fb: filterbank coefficients
+    :param fb_mean: mean vector of the filterbank coefficients
+    :param fb_std: standard deviation vector of filterbank coefficients
+    :param bnf: bottleneck features
+    :param bnf_mean: mean vector of the bottleneck features
+    :param bnf_std: standard deviation vector of bottleneck features
+    :param label: voice activity detection labels per frame
+    """
     if cep is not None:
         A_cep = 2 * 32767. / (cep.max() - cep.min())
         B_cep = (cep.max() + cep.min()) * 32767. / (cep.max() - cep.min())
@@ -1253,6 +1362,7 @@ def _write_show_htk(show,
                           compression="gzip",
                           fletcher32=True)
 
+
 def _write_show_percentile(show,
                            fh,
                            cep, cep_mean, cep_std,
@@ -1260,6 +1370,25 @@ def _write_show_percentile(show,
                            fb, fb_mean, fb_std,
                            bnf, bnf_mean, bnf_std,
                            label):
+    """
+    Write features for a given show in HDF5 and HTK format
+
+    :param show: name of the sow to write
+    :param fh: file handler in HDF5 format
+    :param cep: cepstral coefficients
+    :param cep_mean: mean vector of the cepstral coefficients
+    :param cep_std: standard deviation vector of the cepstral coefficients
+    :param energy: energy value per frame
+    :param energy_mean: mean of the energy
+    :param energy_std: standard deviation of the energy
+    :param fb: filterbank coefficients
+    :param fb_mean: mean vector of the filterbank coefficients
+    :param fb_std: standard deviation vector of filterbank coefficients
+    :param bnf: bottleneck features
+    :param bnf_mean: mean vector of the bottleneck features
+    :param bnf_std: standard deviation vector of bottleneck features
+    :param label: voice activity detection labels per frame
+    """
     if cep is not None:
         _add_percentile_dataset(fh, show + '/cep', cep)
 
@@ -1318,7 +1447,6 @@ def _write_show_percentile(show,
                           fletcher32=True)
 
 
-
 def write_hdf5(show,
                fh,
                cep, cep_mean, cep_std,
@@ -1343,7 +1471,7 @@ def write_hdf5(show,
     :param bnf_mean: pre-computed mean of the bottleneck features
     :param bnf_std: pre-computed standard deviation of the bottleneck features
     :param label: vad labels to store
-    :param compressed: boolean, default is False
+    :param compression: boolean, default is False
     :return:
     """
     #write the the type of compression: could be:
@@ -1382,13 +1510,14 @@ def write_hdf5(show,
                                bnf, bnf_mean, bnf_std,
                                label)
 
+
 def read_hdf5(h5f, show, dataset_list=("cep", "fb", "energy", "vad", "bnf")):
     """
 
     :param h5f: HDF5 file handler to read from
     :param show: identifier of the show to read
     :param dataset_list: list of datasets to read and concatenate
-    :return:
+    :return: a numpy array with acoustic features and one with VAD labels
     """
     compression_type = {0:'none', 1:'htk', 2:'percentile'}
     if "compression" not in h5f:
@@ -1464,17 +1593,18 @@ def read_hdf5(h5f, show, dataset_list=("cep", "fb", "energy", "vad", "bnf")):
     return feat.astype(numpy.float32), label
 
 
-
 def _rms_energy(x):
     return 10*numpy.log10((1e-12 + x.dot(x))/len(x))
 
+
 def _add_noise(signal, noise_file_name, snr, sample_rate):
     """
+    Add noise to a speech signal
 
-    :param signal:
-    :param noise_file_name:
-    :param snr:
-    :return:
+    :param signal: the original signal to augmente
+    :param noise_file_name: the name fo the noise file to use
+    :param snr: signal to noise ratio
+    :return: the signal augmented with noise
     """
     # Open noise file
     if isinstance(noise_file_name, numpy.ndarray):
@@ -1502,6 +1632,7 @@ def _add_noise(signal, noise_file_name, snr, sample_rate):
 
     return (noisy - noisy.mean()) / noisy.std()
 
+
 def bin_interp(upcount, lwcount, upthr, lwthr, margin, tol=0.1):
     n_iter = 1
     if abs(upcount - upthr - margin) < tol:
@@ -1524,6 +1655,7 @@ def bin_interp(upcount, lwcount, upthr, lwthr, margin, tol=0.1):
                 midthr = (lwthr + midthr)/2
             diff = midcount - midthr - margin
     return midcount
+
 
 def asl_meter(x, fs, nbits=16):
     '''Measure the Active Speech Level (ASR) of x following ITU-T P.56.
@@ -1587,6 +1719,7 @@ def asl_meter(x, fs, nbits=16):
 
     return asl
 
+
 def _add_reverb(signal, reverb_file_name, sample_rate, reverb_level=-26.0, ):
     '''Adds reverb (convolutive noise) to a speech signal.
     The output speech level is normalized to asl_level.
@@ -1599,108 +1732,4 @@ def _add_reverb(signal, reverb_file_name, sample_rate, reverb_level=-26.0, ):
     y = y/10**(asl_meter(y, sample_rate)/20) * 10**(reverb_level/20)
 
     return (y - y.mean()) / y.std()
-
-
-def degrade_audio(input_path,
-                  input_extension,
-                  output_path,
-                  output_extension,
-                  input_filename,
-                  output_filename,
-                  sampling_frequency=16000,
-                  noise_file_name=None,
-                  snr=-10,
-                  reverb_file_name=None,
-                  reverb_level=-26.):
-    """
-
-    :param input_filename:
-    :param output_filename:
-    :return:
-    """
-
-    # Open audio file, get the signal and possibly the sampling frequency
-    signal, sample_rate = read_audio(input_filename, sampling_frequency)
-    if signal.ndim == 1:
-        signal = signal[:, numpy.newaxis]
-
-    for channel in range(signal.shape[1]):
-        if noise_file_name is not None:
-            signal[:, channel] = _add_noise(signal[:, channel], noise_file_name, snr, sampling_frequency)
-        if reverb_file_name is not None:
-            signal[:, channel] = _add_reverb(signal[:, channel], reverb_file_name, sampling_frequency, reverb_level)
-
-    write_wav(signal, output_filename, sample_rate)
-
-
-@process_parallel_lists
-def augment_list(input_path,
-                 input_extension,
-                 output_path,
-                 output_extension,
-                 sampling_frequency,
-                 show_list,
-                 channel_list,
-                 audio_file_list=None,
-                 feature_file_list=None,
-                 noise_file_list=None,
-                 snr_list=None,
-                 reverb_file_list=None,
-                 reverb_levels=None,
-                 num_thread=1):
-        """
-        Compute the acoustic parameters (filter banks, cepstral coefficients, log-energy and bottleneck features
-        for a list of audio files and save them to disk in a HDF5 format
-        The process is parallelized if num_thread is higher than 1
-
-
-        :param show_list: list of IDs of the show to process
-        :param channel_list: list of channel indices corresponding to each show
-        :param audio_file_list: list of input audio files if the name is independent from the ID of the show
-        :param feature_file_list: list of output audio files if the name is independent from the ID of the show
-        :param num_thread: number of parallel process to run
-        :return:
-        """
-
-        # get the length of the longest list
-        max_length = max([len(l) for l in [show_list, channel_list, audio_file_list, feature_file_list]
-                          if l is not None])
-
-        if show_list is None:
-            show_list = numpy.empty(int(max_length), dtype='|O')
-        if audio_file_list is None:
-            audio_file_list = numpy.empty(int(max_length), dtype='|O')
-        if feature_file_list is None:
-            feature_file_list = numpy.empty(int(max_length), dtype='|O')
-        if noise_file_list is None:
-            noise_file_list =  numpy.empty(int(max_length), dtype='|O')
-            snr_list = numpy.empty(int(max_length), dtype='|O')
-        elif snr_list is None:
-            snr_list = numpy.full(int(max_length), 5.)
-        if reverb_file_list is None:
-            reverb_file_list = numpy.empty(int(max_length), dtype='|O')
-            reverb_levels = numpy.empty(int(max_length), dtype='|O')
-        elif reverb_levels is None:
-            reverb_levels = numpy.full(int(max_length), -26.)
-
-
-        for show, channel, input_file, output_file, noise_file, snr, reverb_file, reverb_level in zip(show_list,
-                                                                                                       channel_list,
-                                                                                                       audio_file_list,
-                                                                                                       feature_file_list,
-                                                                                                       noise_file_list,
-                                                                                                       snr_list,
-                                                                                                       reverb_file_list,
-                                                                                                       reverb_levels):
-            degrade_audio(input_path, input_extension, output_path, output_extension,
-                          show,
-                          input_file,
-                          output_file,
-                          sampling_frequency,
-                          noise_file,
-                          snr,
-                          reverb_file,
-                          reverb_level)
-
-
 

@@ -454,9 +454,13 @@ def init_logging(level=logging.DEBUG, filename=None):
     logging.getLogger('').addHandler(console)
 
 
-
-
 def write_matrix_hdf5(M, filename):
+    """
+    Write a matrix in HDF5 format
+
+    :param M: the matrix to write
+    :param filename: name of the output file
+    """
     with h5py.File(filename, "w") as h5f:
         h5f.create_dataset("matrix", data=M,
                            compression="gzip",
@@ -464,6 +468,12 @@ def write_matrix_hdf5(M, filename):
 
 
 def read_matrix_hdf5(filename):
+    """
+    Read a matrix from an HDF5 FILE
+
+    :param filename: name of the file to read
+    :return: the matrix in a numpy array
+    """
     with h5py.File(filename, "r") as h5f:
         M = h5f.get("matrix")[()]
     return M

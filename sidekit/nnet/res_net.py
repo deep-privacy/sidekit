@@ -438,13 +438,17 @@ class PreResNet34(torch.nn.Module):
     """
     Networks that contains only the ResNet part until pooling, with NO classification layers
     """
-    def __init__(self, block=BasicBlock, num_blocks=[3, 1, 3, 1, 5, 1, 2], speaker_number=10):
+    def __init__(self, block=BasicBlock, num_blocks=(3, 1, 3, 1, 5, 1, 2), speaker_number=10):
         super(PreResNet34, self).__init__()
         self.in_planes = 128
 
         self.speaker_number = speaker_number
-        self.conv1 = torch.nn.Conv2d(1, 128, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        self.conv1 = torch.nn.Conv2d(1,
+                                     128,
+                                     kernel_size=3,
+                                     stride=1,
+                                     padding=1,
+                                     bias=False)
 
         self.bn1 = torch.nn.BatchNorm2d(128)
 
@@ -457,7 +461,6 @@ class PreResNet34(torch.nn.Module):
         self.layer6 = self._make_layer(block, 256, num_blocks[5], stride=2)
         self.layer7 = self._make_layer(block, 256, num_blocks[5], stride=1)
 
-
     def _make_layer(self, block, planes, num_blocks, stride):
         """
 
@@ -480,30 +483,35 @@ class PreResNet34(torch.nn.Module):
         :param x:
         :return:
         """
-        out = x.unsqueeze(1)
-        out = torch.nn.functional.relu(self.bn1(self.conv1(out)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = self.layer5(out)
-        out = self.layer6(out)
-        out = self.layer7(out)
-        out = torch.flatten(out, start_dim=1, end_dim=2)
-        return out
+        x = x.unsqueeze(1)
+        x = x.permute(0, 1, 3, 2)
+        x = x.to(memory_format=torch.channels_last)
+        x = torch.nn.functional.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = self.layer6(x)
+        x = self.layer7(x)
+        return x
 
 
 class PreHalfResNet34(torch.nn.Module):
     """
     Networks that contains only the ResNet part until pooling, with NO classification layers
     """
-    def __init__(self, block=BasicBlock, num_blocks=[3, 4, 6, 3], speaker_number=10):
+    def __init__(self, block=BasicBlock, num_blocks=(3, 4, 6, 3), speaker_number=10):
         super(PreHalfResNet34, self).__init__()
         self.in_planes = 32
         self.speaker_number = speaker_number
 
-        self.conv1 = torch.nn.Conv2d(1, 32, kernel_size=3,
-                               stride=(1, 1), padding=1, bias=False)
+        self.conv1 = torch.nn.Conv2d(1,
+                                     32,
+                                     kernel_size=3,
+                                     stride=(1, 1),
+                                     padding=1,
+                                     bias=False)
         self.bn1 = torch.nn.BatchNorm2d(32)
 
         #  With block = [3, 4, 6, 3]
@@ -512,7 +520,6 @@ class PreHalfResNet34(torch.nn.Module):
         self.layer3 = self._make_layer(block, 128, num_blocks[2], stride=(2, 2))
         self.layer4 = self._make_layer(block, 256, num_blocks[3], stride=(2, 2))
 
-
     def _make_layer(self, block, planes, num_blocks, stride):
         """
 
@@ -535,29 +542,33 @@ class PreHalfResNet34(torch.nn.Module):
         :param x:
         :return:
         """
-        out = x.unsqueeze(1)
-        out = out.contiguous(memory_format=torch.channels_last)
-        out = torch.nn.functional.relu(self.bn1(self.conv1(out)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = out.contiguous(memory_format=torch.contiguous_format)
-        out = torch.flatten(out, start_dim=1, end_dim=2)
-        return out
+        if len(x.shape) == 3:
+            x = x.unsqueeze(1)
+            x = x.permute(0, 1, 3, 2)
+        x = x.to(memory_format=torch.channels_last)
+        x = torch.nn.functional.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        return x
 
 
 class PreFastResNet34(torch.nn.Module):
     """
     Networks that contains only the ResNet part until pooling, with NO classification layers
     """
-    def __init__(self, block=BasicBlock, num_blocks=[3, 4, 6, 3], speaker_number=10):
+    def __init__(self, block=BasicBlock, num_blocks=(3, 4, 6, 3), speaker_number=10):
         super(PreFastResNet34, self).__init__()
         self.in_planes = 16
         self.speaker_number = speaker_number
 
-        self.conv1 = torch.nn.Conv2d(1, 16, kernel_size=7,
-                               stride=(2, 1), padding=3, bias=False)
+        self.conv1 = torch.nn.Conv2d(1,
+                                     16,
+                                     kernel_size=7,
+                                     stride=(1, 2),
+                                     padding=3,
+                                     bias=False)
         self.bn1 = torch.nn.BatchNorm2d(16)
 
         #  With block = [3, 4, 6, 3]
@@ -566,7 +577,6 @@ class PreFastResNet34(torch.nn.Module):
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=(2, 2))
         self.layer4 = self._make_layer(block, 128, num_blocks[3], stride=(1, 1))
 
-
     def _make_layer(self, block, planes, num_blocks, stride):
         """
 
@@ -589,16 +599,15 @@ class PreFastResNet34(torch.nn.Module):
         :param x:
         :return:
         """
-        out = x.unsqueeze(1)
-        out = out.contiguous(memory_format=torch.channels_last)
-        out = torch.nn.functional.relu(self.bn1(self.conv1(out)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = out.contiguous(memory_format=torch.contiguous_format)
-        out = torch.flatten(out, start_dim=1, end_dim=2)
-        return out
+        x = x.unsqueeze(1)
+        x = x.permute(0, 1, 3, 2)
+        x = x.to(memory_format=torch.channels_last)
+        x = torch.nn.functional.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        return x
 
 
 def ResNet34():

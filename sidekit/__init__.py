@@ -119,7 +119,7 @@ from .jfa_scoring import jfa_scoring
 from .score_normalization import znorm
 from .score_normalization import tnorm
 from .score_normalization import ztnorm
-from .score_normalization import snorm
+from .score_normalization import asnorm
 
 from .sidekit_io import write_norm_hdf5
 from .sidekit_io import write_matrix_hdf5
@@ -187,5 +187,5 @@ __maintainer__ = "Anthony Larcher"
 __email__ = "anthony.larcher@univ-lemans.fr"
 __status__ = "Production"
 __docformat__ = 'reStructuredText'
-__version__="1.4"
+__version__="1.9"
 

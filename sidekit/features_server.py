@@ -48,7 +48,7 @@ __maintainer__ = "Anthony Larcher"
 __email__ = "anthony.larcher@univ-lemans.fr"
 __status__ = "Production"
 __docformat__ = 'reStructuredText'
-#comment
+
 
 class FeaturesServer(object):
     """
@@ -494,12 +494,12 @@ class FeaturesServer(object):
     def get_features_per_speaker(self, show, idmap, channel=0, input_feature_filename=None, label=None):
         """
         Load a single file and return a dictionary with spk_ids as keys and (feature, label) as data
-        :param show:
-        :param channel:
-        :param input_feature_filename:
-        :param label:
-        :param idmap:
-        :return:
+        :param show: name of the show
+        :param channel:  number of the audio channel
+        :param input_feature_filename: name of the input file to read from
+        :param label: voice activity detection labels (optional)
+        :param idmap: idmap to select the features
+        :return: a numpy array of acoustic features
         """
         if input_feature_filename is not None:
             self.feature_filename_structure = input_feature_filename
@@ -641,7 +641,6 @@ class FeaturesServer(object):
 
         return numpy.vstack(features_list)
 
-
     def _stack_features_worker(self,
                                input_queue,
                                output_queue):
@@ -660,8 +659,6 @@ class FeaturesServer(object):
             output_queue.put(self.load(*next_task)[0])
             input_queue.task_done()
 
-
-    #@profile
     def stack_features_parallel(self,  # fileList, numThread=1):
                                 show_list,
                                 channel_list=None,

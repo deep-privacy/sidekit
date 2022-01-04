@@ -54,6 +54,7 @@ __docformat__ = 'reStructuredText'
 
 data_type = numpy.float32
 
+
 def total_variability(stat_server_file_name,
                       ubm,
                       tv_rank,
@@ -90,6 +91,7 @@ def total_variability(stat_server_file_name,
 
         mpirun --hostfile hostfile ./my_script.py
 
+
     :param comm: MPI.comm object defining the group of nodes to use
     :param stat_server_file_name: name of the StatServer file to load (make sure you provide absolute path and that
     it is accessible from all your nodes).
@@ -98,6 +100,7 @@ def total_variability(stat_server_file_name,
     :param nb_iter: number of EM iteration
     :param min_div: boolean, if True, apply minimum divergence re-estimation
     :param tv_init: initial matrix to start the EM iterations with
+    :param save_init: save matrices used for initialization
     :param output_file_name: name of the file where to save the matrix
     """
     comm = MPI.COMM_WORLD
@@ -251,12 +254,13 @@ def extract_ivector(tv,
     """
     Estimate i-vectors for a given StatServer using multiple process on multiple nodes.
 
+    :param tv: total variability matrix
     :param comm: MPI.comm object defining the group of nodes to use
     :param stat_server_file_name: file name of the sufficient statistics StatServer HDF5 file
     :param ubm: Mixture object (the UBM)
     :param output_file_name: name of the file to save the i-vectors StatServer in HDF5 format
     :param uncertainty: boolean, if True, saves a matrix with uncertainty matrices (diagonal of the matrices)
-    :param prefix: prefixe of the dataset to read from in HDF5 file
+    :param prefix: prefix of the dataset to read from in HDF5 file
     """
     assert(isinstance(ubm, Mixture) and ubm.validate()), "Second argument must be a proper Mixture"
 
@@ -353,16 +357,18 @@ def EM_split(ubm,
              num_thread=1):
     """Expectation-Maximization estimation of the Mixture parameters.
 
-    :param comm:
-    :param features: a 2D-array of feature frames (one raow = 1 frame)
+    :param ubm: mixture object (universal background model)
+    :param features_server: a feature server object to load from
+    :param feature_list: a list of feature files to load from
     :param distrib_nb: final number of distributions
     :param iterations: list of iteration number for each step of the learning process
     :param llk_gain: limit of the training gain. Stop the training when gain between
             two iterations is less than this value
     :param save_partial: name of the file to save intermediate mixtures,
            if True, save before each split of the distributions
-    :param ceil_cov:
-    :param floor_cov:
+    :param ceil_cov: co-variance ceiling value
+    :param floor_cov: co-variance flooring value
+    :param num_thread: number of processeses to launch for parallel computation
 
     :return llk: a list of log-likelihoods obtained after each iteration
     """

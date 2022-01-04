@@ -124,6 +124,91 @@ class MfccFrontEnd(torch.nn.Module):
         return mfcc
 
 
+class WavLmFrontEnd(torch.nn.Module):
+    """
+    AJOUTER le HOW TO...
+    """
+
+    def __init__(self):
+        super(WavLmFrontEnd, self).__init__()
+        self.feat_type = 'wavlm_large'
+        self.feature_extract = torch.hub.load('s3prl/s3prl', self.feat_type)
+        self.update_extract = False
+        self.feature_selection = 'hidden_states'
+        self.sr = 16000
+        self.feat_num = self.get_feat_num()
+        self.instance_norm = torch.nn.InstanceNorm1d(1024)
+        self.feature_weight = torch.nn.Parameter(torch.zeros(self.feat_num))
+
+        if self.feat_type != 'fbank' and self.feat_type != 'mfcc':
+            freeze_list = ['final_proj', 'label_embs_concat', 'mask_emb', 'project_q', 'quantizer']
+            for name, param in self.feature_extract.named_parameters():
+                for freeze_val in freeze_list:
+                    if freeze_val in name:
+                        param.requires_grad = False
+                        break
+
+        if not self.update_extract:
+            for param in self.feature_extract.parameters():
+                param.requires_grad = False
+
+    def get_feat_num(self):
+        """
+
+        :return:
+        """
+        self.feature_extract.eval()
+        wav = [torch.randn(self.sr).to(next(self.feature_extract.parameters()).device)]
+        with torch.no_grad():
+            features = self.feature_extract(wav)
+        select_feature = features[self.feature_selection]
+        if isinstance(select_feature, (list, tuple)):
+            return len(select_feature)
+        else:
+            return 1
+
+    def get_feat(self, x):
+        """
+
+        :param x:
+        :return:
+        """
+        if self.update_extract:
+            x = self.feature_extract([sample for sample in x])
+        else:
+            with torch.no_grad():
+                if self.feat_type == 'fbank' or self.feat_type == 'mfcc':
+                    x = self.feature_extract(x) + 1e-6  # B x feat_dim x time_len
+                else:
+                    x = self.feature_extract([sample for sample in x])
+
+        if self.feat_type == 'fbank':
+            x = x.log()
+
+        if self.feat_type != "fbank" and self.feat_type != "mfcc":
+            x = x[self.feature_selection]
+            if isinstance(x, (list, tuple)):
+                x = torch.stack(x, dim=0)
+            else:
+                x = x.unsqueeze(0)
+            norm_weights = torch.nn.functional.softmax(self.feature_weight, dim=-1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            x = (norm_weights * x).sum(dim=0)
+            x = torch.transpose(x, 1, 2) + 1e-6
+
+        x = self.instance_norm(x)
+        return x
+
+    def forward(self, x, is_eval=False):
+        """
+
+        :param x:
+        :param is_eval:
+        :return:
+        """
+
+        return self.get_feat(x)
+
+
 class MelSpecFrontEnd(torch.nn.Module):
     """
     Module that compute Mel spetrogramm on an audio signal
@@ -246,3 +331,4 @@ class RawPreprocessor(torch.nn.Module):
         out = self.lrelu_keras(out)
 
         return out
+

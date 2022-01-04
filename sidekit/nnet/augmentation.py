@@ -173,6 +173,9 @@ def data_augmentation(speech,
     aug_idx = random.sample(range(len(transform_dict.keys())), k=transform_number)
     augmentations = numpy.array(list(transform_dict.keys()))[aug_idx]
 
+    if "none" in augmentations:
+        pass
+
     if "stretch" in augmentations:
         strech = torchaudio.functional.TimeStretch()
         rate = random.uniform(0.8,1.2)
@@ -183,7 +186,7 @@ def data_augmentation(speech,
         rir_fn = transform_dict["add_reverb"]["data_path"] + rir_nfo  # TODO harmonize with noise
         rir, rir_fs = torchaudio.load(rir_fn)
         assert rir_fs == sample_rate
-        #rir = rir[rir_nfo[1], :] #keep selected channel
+        # rir = rir[rir_nfo[1], :] #keep selected channel
         speech = torch.tensor(signal.convolve(speech, rir, mode='full')[:, :speech.shape[1]])
 
     if "add_noise" in augmentations:
@@ -258,16 +261,16 @@ def data_augmentation(speech,
         )
 
     if "codec" in augmentations:
-        final_shape = speech.shape[1]
-        configs = [
-            ({"format": "wav", "encoding": 'ULAW', "bits_per_sample": 8}, "8 bit mu-law"),
-            ({"format": "gsm"}, "GSM-FR"),
-            ({"format": "mp3", "compression": -9}, "MP3"),
-            ({"format": "vorbis", "compression": -1}, "Vorbis")
-        ]
-        param, title = random.choice(configs)
-        speech = torchaudio.functional.apply_codec(speech, sample_rate, **param)
-        speech = speech[:, :final_shape]
+         final_shape = speech.shape[1]
+         configs = [
+             ({"format": "wav", "encoding": 'ULAW', "bits_per_sample": 8}, "8 bit mu-law"),
+             ({"format": "wav", "encoding": 'ALAW', "bits_per_sample": 8}, "8 bit a-law"),
+             ({"format": "mp3", "compression": -9}, "MP3"),
+             ({"format": "vorbis", "compression": -1}, "Vorbis")
+         ]
+         param, title = random.choice(configs)
+         speech = torchaudio.functional.apply_codec(speech, sample_rate, **param)
+         speech = speech[:, :final_shape]
 
     return speech
 

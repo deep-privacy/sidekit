@@ -62,6 +62,15 @@ __docformat__ = 'reStructuredText'
 
 
 def compute_llk(stat, V, sigma, U=None):
+    """
+    Compute log-likelihood ratio
+
+    :param stat: statserver object
+    :param V: eigenvoice matrix
+    :param sigma: covariance vector
+    :param U: eigenchannel matrix (optional)
+    :return: a vector of log-likelihood ratio
+    """
     # Compute Likelihood
     (n, d) = stat.stat1.shape
     centered_data = stat.stat1 - stat.get_mean_stat1()
@@ -1034,10 +1043,9 @@ class StatServer:
         for speaker_id in unique_speaker:
             spk_ctr_vec = self.get_model_stat1(speaker_id) \
                       - numpy.mean(self.get_model_stat1(speaker_id), axis=0)
-            #WCCN += numpy.dot(spk_ctr_vec.transpose(), spk_ctr_vec)
+
             WCCN += numpy.dot(spk_ctr_vec.transpose(), spk_ctr_vec) / spk_ctr_vec.shape[0]
 
-        #WCCN /= self.stat1.shape[0]
         WCCN = WCCN / unique_speaker.shape[0]
 
         # Choleski decomposition of the WCCN matrix

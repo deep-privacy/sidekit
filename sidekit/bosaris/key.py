@@ -108,6 +108,14 @@ class Key:
 
     @classmethod
     def create(cls, modelset, segset, tar, non):
+        """
+        Class method that creates a Key object
+        :param modelset: a numpy array with model IDs
+        :param segset: a numpy array with segment IDs
+        :param tar: a matrix of boolean, True if the trial is target, dimensions must be: number of models X number of segments
+        :param non: a matrix of boolean, True if the trial is impostor, dimensions must be: number of models X number of segments
+        :return: a new key object
+        """
         key = Key()
         key.modelset = modelset
         key.segset = segset

@@ -30,10 +30,11 @@ to perform speaker verification.
 import numpy
 import os
 import logging
-from sidekit.libsvm.svmutil import svm_problem, svm_parameter, svm_train
-from sidekit.statserver import StatServer
 import multiprocessing
 import sidekit.sv_utils
+
+from sidekit.libsvm.svmutil import svm_problem, svm_parameter, svm_train
+from sidekit.statserver import StatServer
 
 
 __license__ = "LGPL"

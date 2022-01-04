@@ -30,6 +30,7 @@ formats.
 
 import copy
 import numpy
+import torch
 
 __license__ = "LGPL"
 __author__ = "Anthony Larcher"
@@ -42,17 +43,18 @@ __docformat__ = 'reStructuredText'
 
 def znorm(enrol_test_scores, enrol_imp_scores, sym=False):
     """
-    imp_scores are formed by scoring enrollment utterance ewith all files from the impostor cohort
+    Apply Z-norm to a set of scores
+    imp_scores are formed by scoring enrollment utterance with all files from the impostor cohort
     thus: enrol_test_scores.modelset and enrol_imp_scores.modelset must be the same
 
     This function assumes that all models from enrol_test_scores are in enrol_imp_scores
 
-    :param enrol_test_scores:
-    :param enrol_imp_scores:
-    :return:
+    :param sym:
+    :param enrol_test_scores: a score object of trials between enrolment data and test data
+    :param enrol_imp_scores: a score object of trials between enrolment data and impostor data
+    :return: a scores object of normalized scores
     """
     # Align enrol_test_scores.modelset and enrol_imp_scores.modelset
-    #enrol_imp_scores.filter(enrol_test_scores.modelset, enrol_imp_scores.segset, keep=True)
     scores_znorm = copy.deepcopy(enrol_test_scores)
     scores_znorm.sort()
     enrol_imp_scores.sort()
@@ -72,13 +74,13 @@ def znorm(enrol_test_scores, enrol_imp_scores, sym=False):
 
 def tnorm(enrol_test_scores, imp_test_scores):
     """
+    Apply t-normalization on a set of scores
 
-    :param enrol_test_scores:
-    :param imp_test_scores:
-    :return:
+    :param enrol_test_scores: a score object of trials between enrolment data and test data
+    :param imp_test_scores:a score object of trials between impostor data and test data
+    :return: the normalized scores
     """
     # Align enrol_test_scores.segset and imp_test_scores.segset
-    #imp_test_scores.filter(imp_test_scores.modelset, enrol_test_scores.segset, keep=True)
     scores_tnorm = copy.deepcopy(enrol_test_scores)
     scores_tnorm.sort()
     imp_test_scores.sort()
@@ -93,12 +95,13 @@ def tnorm(enrol_test_scores, imp_test_scores):
 
 def ztnorm(enrol_test_scores, enrol_imp_scores, imp_test_scores, imp_imp_scores):
     """
+    Apply a sequence of z-norm then t-norm
 
-    :param enrol_test_scores:
-    :param enrol_imp_scores:
-    :param imp_test_scores:
-    :param imp_imp_scores:
-    :return:
+    :param enrol_test_scores: a score object of trials between enrolment data and test data
+    :param enrol_imp_scores: a score object of trials between enrolment data and impostor data
+    :param imp_test_scores: a score object of trials between impostor data and test data
+    :param imp_imp_scores: a score object of trials between impostor data and impostor data
+    :return: the normalized scores
     """
 
     # Apply Z-norm first on enrol_test_scores by using enrol_imp_scores
@@ -114,24 +117,26 @@ def ztnorm(enrol_test_scores, enrol_imp_scores, imp_test_scores, imp_imp_scores)
     return zt_enrol_test_scores
 
 
-def snorm(enrol_test_scores, enrol_imp_scores, imp_test_scores):
+def asnorm(enrol_xv, cohort_xv, ndx):
     """
 
-    :param enrol_test_scores:
-    :return:
+    :param enrol_test_scores: a score object of trials between enrolment data and test data
+    :return:the normalized scores
     """
-    # Compute z-norm scores
-    z_enrol_test_scores = znorm(enrol_test_scores, enrol_imp_scores)
+    # Compute cosine similarity
+    enrol_test_scores = torch.einsum('ij,kj', enrol_xv, enrol_xv).numpy()
+    cohort_xv = torch.nn.functional.normalize(cohort_xv, dim=1)
 
-    # Compute t-norm scores
-    t_enrol_test_scores = tnorm(enrol_test_scores, imp_test_scores)
 
-    # Average the z and t normed scores
-    s_enrol_test_scores = copy.deepcopy(enrol_test_scores)
-    s_enrol_test_scores.scoremat =  0.5 * (z_enrol_test_scores.scoremat +  t_enrol_test_scores.scoremat)
+
+    calib_scores = torch.einsum('ij,kj', enrol_xv, cohort_xv)
+    topk_cohort = calib_scores.topk(200, dim=1).values
+    calib_mean = topk_cohort.mean(dim=1).numpy()
+    calib_std = topk_cohort.std(dim=1).numpy()
+
+    s_enrol_test_scores = 0.5 * ((enrol_test_scores.T - calib_mean) / calib_std).T +\
+                          0.5 * (enrol_test_scores - calib_mean) / calib_std
 
     return s_enrol_test_scores
 
 
-def asnorm(enrol_test_scores):
-    pass

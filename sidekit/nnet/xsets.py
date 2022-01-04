@@ -26,19 +26,16 @@ Copyright 2014-2021 Anthony Larcher
 
 """
 
-import math
 import numpy
 import pandas
 import random
 import torch
 import torchaudio
 import tqdm
-import soundfile
-import yaml
 
-from torch.utils.data import Dataset
 from .augmentation import data_augmentation
 from ..bosaris.idmap import IdMap
+from torch.utils.data import Dataset
 
 __license__ = "LGPL"
 __author__ = "Anthony Larcher"
@@ -64,15 +61,17 @@ class SideSampler(torch.utils.data.Sampler):
                  rank=0,
                  num_process=1,
                  num_replicas=1):
-        """[summary]
+        """
 
-        Args:
-            data_source ([type]): [description]
-            spk_count ([type]): [description]
-            examples_per_speaker ([type]): [description]
-            samples_per_speaker ([type]): [description]
-            batch_size ([type]): [description]
-            num_replicas: number of GPUs for parallel computing
+        :param data_source:
+        :param spk_count:
+        :param examples_per_speaker:
+        :param samples_per_speaker:
+        :param batch_size:
+        :param seed:
+        :param rank:
+        :param num_process:
+        :param num_replicas: number of GPUs for parallel computing
         """
         self.train_sessions = data_source
         self.labels_to_indices = dict()
@@ -89,7 +88,6 @@ class SideSampler(torch.utils.data.Sampler):
         assert (self.samples_per_speaker * self.spk_count * self.examples_per_speaker) % self.num_process == 0
 
         self.batch_size = batch_size // (self.examples_per_speaker * self.num_replicas)
-        #self.batch_size = batch_size // self.examples_per_speaker
 
         # reference all segment indexes per speaker
         for idx in range(self.spk_count):
@@ -105,8 +103,11 @@ class SideSampler(torch.utils.data.Sampler):
 
         self.segment_cursors = numpy.zeros((len(self.labels_to_indices),), dtype=numpy.int)
 
-
     def __iter__(self):
+        """
+
+        :return:
+        """
         g = torch.Generator()
         g.manual_seed(self.seed + self.epoch)
         numpy.random.seed(self.seed + self.epoch)
@@ -159,14 +160,14 @@ class SideSampler(torch.utils.data.Sampler):
         #return (self.samples_per_speaker * self.spk_count * self.examples_per_speaker) // self.num_process
         return (self.samples_per_speaker * self.spk_count * self.examples_per_speaker * self.num_replicas) // self.num_process
 
-
-
     def set_epoch(self, epoch: int) -> None:
         self.epoch = epoch
 
 
 class SideSet(Dataset):
-
+    """
+    Dataset that loads the data for network training
+    """
     def __init__(self,
                  dataset,
                  set_type="train",
@@ -175,14 +176,19 @@ class SideSet(Dataset):
                  overlap=0.,
                  dataset_df=None,
                  min_duration=0.165,
-                 output_format="pytorch",
+                 output_format="pytorch"
                  ):
         """
 
-        :param dataset_yaml: name of the YAML file describing the dataset
+        :param dataset: name of the YAML file describing the dataset
         :param set_type: string, can be "train" or "validation"
         :param chunk_per_segment: number of chunks to select for each segment
         default is 1 and -1 means select all possible chunks
+        :param transform_number:
+        :param overlap:
+        :param dataset_df:
+        :param min_duration:
+        :param output_format:
         """
         self.data_path = dataset["data_path"]
         self.sample_rate = int(dataset["sample_rate"])
@@ -269,6 +275,8 @@ class SideSet(Dataset):
                 self.transform["codec"] = []
             if "phone_filtering" in transforms:
                 self.transform["phone_filtering"] = []
+            if "stretch" in transforms:
+                self.transform["stretch"] = []
 
         self.noise_df = None
         if "add_noise" in self.transform:
@@ -282,7 +290,6 @@ class SideSet(Dataset):
             tmp_rir_df = tmp_rir_df.loc[tmp_rir_df["type"] == "simulated_rirs"]
             # load the RIR database
             self.rir_df = tmp_rir_df.set_index(tmp_rir_df.type)
-
 
     def __getitem__(self, index):
         """
@@ -337,19 +344,25 @@ class SideSet(Dataset):
 
     def __len__(self):
         """
+        Return the length of the dataset
 
         :param self:
         :return:
         """
         return self.len
 
+
 def get_sample(path, resample=None):
-  effects = [
-    ["remix", "1"]
-  ]
-  if resample:
-    effects.append(["rate", f'{resample}'])
-  return torchaudio.sox_effects.apply_effects_file(path, effects=effects)
+    """
+
+    :param path: 
+    :param resample: 
+    :return: 
+    """
+    effects = [["remix", "1"]]
+    if resample:
+        effects.append(["rate", f'{resample}'])
+    return torchaudio.sox_effects.apply_effects_file(path, effects=effects)
 
 
 class IdMapSet(Dataset):
@@ -416,32 +429,32 @@ class IdMapSet(Dataset):
             start = int(self.idmap.start[index] * 0.01 * self.sample_rate)
 
         if self.idmap.stop[index] is None:
+            nfo = torchaudio.info(f"{self.data_path}/{self.idmap.rightids[index]}.{self.file_extension}")
             speech, speech_fs = torchaudio.load(f"{self.data_path}/{self.idmap.rightids[index]}.{self.file_extension}")
+            if nfo.sample_rate != self.sample_rate:
+                speech = torchaudio.transforms.Resample(nfo.sample_rate, self.sample_rate).forward(speech)
             duration = int(speech.shape[1] - start)
         else:
-            duration = int(self.idmap.stop[index] * 0.01 * self.sample_rate) - start
+            # TODO Check if that code is still relevant with torchaudio.load() in case of sample_rate mismatch
+            nfo = torchaudio.info(f"{self.data_path}/{self.idmap.rightids[index]}.{self.file_extension}")
+            assert nfo.sample_rate == self.sample_rate
+            conversion_rate = nfo.sample_rate // self.sample_rate
+            duration = (int(self.idmap.stop[index] * 0.01 * self.sample_rate) - start)
             # add this in case the segment is too short
             if duration <= self.min_duration * self.sample_rate:
                 middle = start + duration // 2
                 start = int(max(0, int(middle - (self.min_duration * self.sample_rate / 2))))
                 duration = int(self.min_duration * self.sample_rate)
             speech, speech_fs = torchaudio.load(f"{self.data_path}/{self.idmap.rightids[index]}.{self.file_extension}",
-                                                frame_offset=start,
-                                                num_frames=duration)
+                                                frame_offset=start * conversion_rate,
+                                                num_frames=duration * conversion_rate)
+            if nfo.sample_rate != self.sample_rate:
+                speech = torchaudio.transforms.Resample(nfo.sample_rate, self.sample_rate).forward(speech)                              
 
-        speech += 10e-6 * torch.randn(speech.shape)
+        # speech += 10e-6 * torch.randn(speech.shape)
 
         if self.sliding_window:
             speech = speech.squeeze().unfold(0, self.window_len, self.window_shift)
-            #middle_points = numpy.arange(start + self.window_len / 2,
-            #                             start + duration - self.window_len / 2,
-            #                             self.window_shift)
-            #starts = middle_points - self.window_shift / 2
-            #stops = middle_points + self.window_shift / 2
-            #starts[0] = start
-            #stops[-1] = start + duration
-            #stop = stops
-            #start = starts
             stop = start + duration
         else:
             stop = start + duration
@@ -453,7 +466,6 @@ class IdMapSet(Dataset):
                                        self.transform_number,
                                        noise_df=self.noise_df,
                                        rir_df=self.rir_df)
-
 
         speech = speech.squeeze()
         
@@ -472,7 +484,6 @@ class IdMapSetPerSpeaker(Dataset):
     """
     DataSet that provide data according to a sidekit.IdMap object
     """
-
     def __init__(self,
                  idmap_name,
                  data_path,
@@ -485,7 +496,7 @@ class IdMapSetPerSpeaker(Dataset):
         """
 
         :param idmap_name:
-        :param data_root_path:
+        :param data_path:
         :param file_extension:
         :param transform_pipeline:
         :param transform_number:
@@ -515,7 +526,7 @@ class IdMapSetPerSpeaker(Dataset):
         if "add_noise" in self.transformation:
             # Load the noise dataset, filter according to the duration
             noise_df = pandas.read_csv(self.transformation["add_noise"]["noise_db_csv"])
-            tmp_df = noise_df.loc[noise_df['duration'] > self.duration]
+            tmp_df = noise_df.loc[noise_df['duration'] > self.len]
             self.noise_df = tmp_df['file_id'].tolist()
 
         self.rir_df = None
@@ -530,11 +541,9 @@ class IdMapSetPerSpeaker(Dataset):
         :param index:
         :return:
         """
-
         # Loop on all segments from the given speaker to load data
         spk_id = self.output_im.leftids[index]
         tmp_data = []
-        #nfo = soundfile.info(f"{self.data_path}/{self.idmap.rightids[index]}.{self.file_extension}")
         for sid, seg_id, seg_start, seg_stop in zip(self.idmap.leftids, self.idmap.rightids,
                                                     self.idmap.start, self.idmap.stop):
             if sid == spk_id:
@@ -564,7 +573,7 @@ class IdMapSetPerSpeaker(Dataset):
                 tmp_data.append(speech)
 
         speech = torch.cat(tmp_data, dim=1)
-        speech += 10e-6 * torch.randn(speech.shape)
+        # speech += 10e-6 * torch.randn(speech.shape)
 
         if len(self.transformation.keys()) > 0:
             speech = data_augmentation(speech,

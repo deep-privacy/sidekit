@@ -435,3 +435,38 @@ class AngularProximityMagnet(torch.nn.Module):
         batch_loss = self.criterion(ap_sim_matrix, torch.arange(0, int(out_positive.shape[0]), device=torch.device("cuda:0"))) \
             + self.magnet_criterion(cos_sim_matrix.flatten().unsqueeze(1), mask.flatten().unsqueeze(1))
         return batch_loss, cce_prediction
+
+
+class CircleMargin(torch.nn.Module):
+    """
+
+    """
+    def __init__(self, in_features, out_features, s=256, m=0.25) -> None:
+        super(CircleMargin, self).__init__()
+        self.margin = m
+        self.gamma = s
+        self.weight = Parameter(torch.FloatTensor(out_features, in_features))
+        torch.nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, x, target=None):
+        """
+
+        :param x:
+        :param target:
+        :return:
+        """
+        cosine = torch.nn.functional.linear(torch.nn.functional.normalize(x),
+                                            torch.nn.functional.normalize(self.weight))
+
+        if target is None:
+            return cosine * self.gamma
+
+        one_hot = torch.zeros_like(cosine)
+        one_hot.scatter_(1, target.view(-1, 1), 1)
+
+        output = (one_hot * (self.margin ** 2 - (1 - cosine) ** 2)) +\
+                 ((1.0 - one_hot) * (cosine ** 2 - self.margin ** 2))
+        output = output * self.gamma
+
+        return output, cosine * self.gamma
+

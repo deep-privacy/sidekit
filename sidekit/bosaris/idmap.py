@@ -259,6 +259,14 @@ class IdMap:
         return ok
 
     def set(self, left, right, start=None, stop=None):
+        """
+        Fill the IdMap object with numpy array of leftids, rightids, and optionally starts and stops
+
+        :param left: a numpy array for leftids
+        :param right: a numpy array for rightids
+        :param start: a numpy array for start time (optional)
+        :param stop: a numpy array for stop time (optional)
+        """
         self.leftids = copy.deepcopy(left)
         self.rightids = copy.deepcopy(right)
 

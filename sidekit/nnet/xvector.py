@@ -36,15 +36,18 @@ import shutil
 import torch
 import tqdm
 import yaml
-import pickle
+#torch.autograd.set_detect_anomaly(True)
 
 from pathlib import Path
 from collections import OrderedDict
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
+from .ecapa_tdnn import ECAPA_TDNN
+from .ecapa_tdnn import ECAPA_TDNN_SMALL
 from .pooling import MeanStdPooling
-from .pooling import AttentivePooling
+from .pooling import AttentivePooling, ChannelWiseCorrPooling
 from .pooling import GruPooling
+from .preprocessor import WavLmFrontEnd
 from .preprocessor import MfccFrontEnd
 from .preprocessor import MelSpecFrontEnd
 from .preprocessor import RawPreprocessor
@@ -60,20 +63,20 @@ from .res_net import PreResNet34
 from ..bosaris import IdMap
 from ..bosaris import Key
 from ..bosaris import Ndx
+from ..score_normalization import asnorm
 from ..statserver import StatServer
 from ..iv_scoring import cosine_scoring
 from .sincnet import SincNet
 from ..bosaris.detplot import rocch, rocch2eer
-from .loss import SoftmaxAngularProto
+from .loss import CircleMargin
 from .loss import l2_norm
 from .loss import ArcMarginProduct
 from .loss import ArcLinear
 from .loss import AngularProximityMagnet
-
+from .loss import SoftmaxAngularProto
 
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
-#torch.backends.cudnn.benchmark = True
 
 __license__ = "LGPL"
 __author__ = "Anthony Larcher"
@@ -86,9 +89,9 @@ __docformat__ = 'reS'
 
 def seed_worker(seed_val):
     """
+    Function that initialize the random seed
 
-    :param worker_id:
-    :return:
+    :param seed_val: not used
     """
     worker_seed = torch.initial_seed() % 2**32
     numpy.random.seed(worker_seed)
@@ -145,7 +148,7 @@ def eer(negatives, positives):
 
     tfr = (abs(p_index))/pos_count
     tfa = (1+abs(n_index))/neg_count
-    if (p_score == n_score and tfr == tfa):
+    if p_score == n_score and tfr == tfa:
         return tfr
 
     while positives[p_index] < negatives[n_index]:
@@ -173,7 +176,7 @@ def eer(negatives, positives):
         eer_predicate = abs(tfr - tfa)
         eer = (tfr + tfa) / 2
     else:
-        return eer
+        return eer_predicate
 
     tfr = p_index/pos_count
     tfa = (1+n_index)/neg_count
@@ -210,22 +213,18 @@ def test_metrics(model,
                  device,
                  model_opts,
                  data_opts,
-                 train_opts):
+                 train_opts,
+                 as_norm=True):
     """Compute model metrics
 
-    Args:
-        model ([type]): [description]
-        validation_loader ([type]): [description]
-        device ([type]): [description]
-        speaker_number ([type]): [description]
-        model_archi ([type]): [description]
+    :param model:
+    :param device:
+    :param model_opts: dictionary of options that describe the model architecture
+    :param data_opts: dictionary of options describing the dataset
+    :param train_opts: dictionary of options to train the model
+    :param as_norm: boolea,, if True, compute the nnormalized scores
 
-    Raises:
-        NotImplementedError: [description]
-        NotImplementedError: [description]
-
-    Returns:
-        [type]: [description]
+    :return: the Equal Error Rate as a float
     """
     transform_pipeline = dict()
 
@@ -237,27 +236,49 @@ def test_metrics(model,
                                  num_thread=train_opts["num_cpu"],
                                  mixed_precision=train_opts["mixed_precision"])
 
-    tar, non = cosine_scoring(xv_stat,
-                              xv_stat,
-                              Ndx(data_opts["test"]["ndx"]),
-                              wccn=None,
-                              check_missing=True,
-                              device=device
-                              ).get_tar_non(Key(data_opts["test"]["key"]))
+    ndx = Ndx(data_opts["test"]["ndx"])
+    key = Key(data_opts["test"]["key"])
 
-    pmiss, pfa = rocch(tar, non)
+    # Compute cosine similarity
+    tsr = torch.nn.functional.normalize(torch.FloatTensor(xv_stat.stat1), dim=1)
+    scores = torch.einsum('ij,kj', tsr, tsr).cpu().numpy()
+    scores = scores[ndx.trialmask]
 
-    return rocch2eer(pmiss, pfa)
+    key.tar = key.tar[ndx.trialmask]
+    key.non = key.non[ndx.trialmask]
+
+    pmiss, pfa = rocch(scores[key.tar], scores[key.non])
+
+    if as_norm:
+        if type(model) is Xtractor:
+            cohort = model.after_speaker_embedding.weight.data
+        else:
+            cohort = model.module.after_speaker_embedding.weight.data
+
+        cohort_xv = torch.nn.functional.normalize(cohort, dim=1).cpu()
+        tsr = torch.nn.functional.normalize(torch.FloatTensor(xv_stat.stat1), dim=1)
+
+        s_enrol_test_scores = asnorm(tsr.cpu(), cohort_xv, ndx)
+
+        s_enrol_test_scores= s_enrol_test_scores[ndx.trialmask]
+
+        norm_pmiss, norm_pfa = rocch(s_enrol_test_scores[key.tar], s_enrol_test_scores[key.non])
+
+
+
+        return rocch2eer(pmiss, pfa), rocch2eer(norm_pmiss, norm_pfa)
+    else:
+        return rocch2eer(pmiss, pfa)
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar', best_filename='model_best.pth.tar'):
     """
+    Save the model in a pickle file
 
-    :param state:
-    :param is_best:
-    :param filename:
-    :param best_filename:
-    :return:
+    :param state: parameters of the model
+    :param is_best: boolean, True if the accuracy is the highest ever
+    :param filename: name of the file to write to (default is checkpoint.pth.tar)
+    :param best_filename: name of the file to wrote to in case is_best is True (default is model_best.pth.tar)
     """
     torch.save(state, filename)
     if is_best:
@@ -271,7 +292,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar', best_filename
 
 class TrainingMonitor():
     """
-
+    Class of object that are used for x-vector model training to monitor accuracy, eer and loss
     """
     def __init__(self,
                  output_file,
@@ -282,7 +303,17 @@ class TrainingMonitor():
                  best_eer=100,
                  compute_test_eer=False
                  ):
+        """
+        Constructor method
 
+        :param output_file: name of the file to write to
+        :param log_interval: number of batches between two consecutive logs
+        :param patience: patience of the training algorithm
+        :param best_accuracy: value of the best accuracy obtained during training
+        :param best_eer_epoch: Number of the epoch at which the best EER has been obtained
+        :param best_eer: value of the best eer obtained during training
+        :param compute_test_eer: boolean, if True, compute the EER on the test set
+        """
         self.current_epoch = 0
         self.log_interval = log_interval
         self.init_patience = patience
@@ -292,6 +323,7 @@ class TrainingMonitor():
         self.best_eer = best_eer
         self.compute_test_eer = compute_test_eer
         self.test_eer = []
+        self.norm_eer = []
 
         self.training_loss = []
         self.training_acc = []
@@ -316,8 +348,7 @@ class TrainingMonitor():
 
     def display(self):
         """
-
-        :return:
+        Display validation and test indicators during the training
         """
         # TODO
         self.logger.critical(f"***Validation metrics - Cross validation accuracy = {self.val_acc[-1]} %, EER = {self.val_eer[-1] * 100} %")
@@ -326,8 +357,7 @@ class TrainingMonitor():
 
     def display_final(self):
         """
-
-        :return:
+        Display validation and test indicators at the end of thre training process
         """
         self.logger.critical(f"Best accuracy {self.best_accuracy * 100.} obtained at epoch {self.best_accuracy_epoch}")
 
@@ -336,10 +366,21 @@ class TrainingMonitor():
                training_acc=None,
                training_loss=None,
                test_eer=None,
+               norm_eer=None,
                val_eer=None,
                val_loss=None,
                val_acc=None):
+        """
+        Update the content of the Monitor
 
+        :param epoch: number of the current epoch
+        :param training_acc:  training accuracy obtained at this epoch
+        :param training_loss:  training loss  obtained at this epoch
+        :param test_eer: eer obtained on the test set
+        :param val_eer: eer obtained on the validation set
+        :param val_loss:  loss obtained for the validation set
+        :param val_acc:  accuracy obtained on the validation set
+        """
         if epoch is not None:
             self.current_epoch = epoch
         if training_acc is not None:
@@ -356,6 +397,8 @@ class TrainingMonitor():
         # remember best accuracy and save checkpoint
         if self.compute_test_eer and test_eer is not None:
             self.test_eer.append(test_eer)
+            if norm_eer is not None:
+                self.norm_eer.append(norm_eer)
             self.is_best = test_eer < self.best_eer
             self.best_eer = min(test_eer, self.best_eer)
             if self.is_best:
@@ -387,13 +430,25 @@ class Xtractor(torch.nn.Module):
                  aam_s=30,
                  embedding_size=256):
         """
-        If config is None, default architecture is created
-        :param model_archi:
+        Creates an Xtractor object
+
+        :param speaker_number: number of speakers in the training set
+        :param model_archi: architecture of the model to create, could be predefined as
+             xvector, resnet34, halfresnet34, fastresnet34, rawnet2,
+             could also be a dictionary describing the architecture or the name of a YAML file containing the description
+             of the architecture (default is a very old TDNN x-vector extractor)
+        :param loss: type of loss can be cce, aam, aps, smn
+        :param norm_embedding: boolean, if True, normalize the embeddings (default is False)
+        :param aam_margin: margin used for the AAM loss (default is 0.2)
+        :param aam_s: s parameter of the AAM loss (default is 30)
+        :param embedding_size: size of the embeddings (default is 256)
         """
         super(Xtractor, self).__init__()
         self.speaker_number = speaker_number
         self.feature_size = None
         self.norm_embedding = norm_embedding
+
+        print(f"MODEL = {model_archi}")
 
         if model_archi == "xvector":
 
@@ -496,8 +551,8 @@ class Xtractor(torch.nn.Module):
             if self.loss == "aam":
                 self.after_speaker_embedding = ArcMarginProduct(self.embedding_size,
                                                                 int(self.speaker_number),
-                                                                s = 30,
-                                                                m = 0.2,
+                                                                s=30,
+                                                                m=0.2,
                                                                 easy_margin = False)
 
             elif self.loss == 'aps':
@@ -519,9 +574,6 @@ class Xtractor(torch.nn.Module):
             self.sequence_network = PreHalfResNet34()
 
             self.embedding_size = embedding_size
-            #self.embedding_size = 256
-            #self.before_speaker_embedding = torch.nn.Linear(in_features = 5120,
-            #                                                out_features = self.embedding_size)
 
             self.before_speaker_embedding = torch.nn.Sequential(OrderedDict([
                 ("lin_be", torch.nn.Linear(in_features = 5120, out_features = self.embedding_size, bias=False)),
@@ -538,12 +590,51 @@ class Xtractor(torch.nn.Module):
                                                                 m = 0.2,
                                                                 easy_margin = False)
             elif self.loss == 'aps':
-                self.after_speaker_embedding = SoftmaxAngularProto(int(self.speaker_number))
+                self.after_speaker_embedding = SoftmaxAngularProto(int(self.speaker_number),
+                                                                   emb_dim=self.embedding_size)
             self.preprocessor_weight_decay = 0.00002
             self.sequence_network_weight_decay = 0.00002
             self.stat_pooling_weight_decay = 0.00002
             self.before_speaker_embedding_weight_decay = 0.00002
             self.after_speaker_embedding_weight_decay = 0.000
+
+        elif model_archi == "wavlmecapa":
+            self.embedding_size = embedding_size
+            self.preprocessor = WavLmFrontEnd()
+            self.sequence_network = ECAPA_TDNN(1024,
+                                               feat_type='fbank',
+                                               sr=16000,
+                                               feature_selection="hidden_states",
+                                               update_extract=False,
+                                               config_path=None)
+
+            self.before_speaker_embedding = torch.nn.Sequential(OrderedDict([
+                ("bn_be", torch.nn.BatchNorm1d(3072)),
+                ("lin_be", torch.nn.Linear(in_features = 3072, out_features = self.embedding_size, bias=True))
+            ]))
+
+            self.stat_pooling = AttentivePooling(1536,
+                                                 num_freqs=1,
+                                                 attention_channels=128,
+                                                 global_context=True)
+
+            self.loss = loss
+            if self.loss == "circle":
+                self.after_speaker_embedding = CircleMargin(self.embedding_size, int(self.speaker_number))
+            elif self.loss == "aam":
+                self.after_speaker_embedding = ArcMarginProduct(self.embedding_size,
+                                                                int(self.speaker_number),
+                                                                s = 30,
+                                                                m = 0.2,
+                                                                easy_margin = False)
+            elif self.loss == 'aps':
+                self.after_speaker_embedding = SoftmaxAngularProto(int(self.speaker_number))
+
+            self.preprocessor_weight_decay = 0.00002
+            self.sequence_network_weight_decay = 0.00002
+            self.stat_pooling_weight_decay = 0.00002
+            self.before_speaker_embedding_weight_decay = 0.00002
+            self.after_speaker_embedding_weight_decay = 0.0002
 
         elif model_archi == "rawnet2":
 
@@ -784,10 +875,11 @@ class Xtractor(torch.nn.Module):
 
     def forward(self, x, is_eval=False, target=None, norm_embedding=True):
         """
+        Forward method
 
-        :param x:
-        :param is_eval: False for training
-        :return:
+        :param x: input data
+        :param is_eval: False for training, True for embedding extraction
+        :return: the output of the network
         """
         if self.preprocessor is not None:
             x = self.preprocessor(x, is_eval)
@@ -796,7 +888,6 @@ class Xtractor(torch.nn.Module):
 
         # Mean and Standard deviation pooling
         x = self.stat_pooling(x)
-
         x = self.before_speaker_embedding(x)
 
         if norm_embedding:
@@ -808,16 +899,19 @@ class Xtractor(torch.nn.Module):
             else:
                 return self.after_speaker_embedding(x), x
 
-        elif self.loss in ['aam', 'aps']:
+        elif self.loss in ['aam', 'aps', 'circle']:
             x = self.after_speaker_embedding(x, target=target), torch.nn.functional.normalize(x, dim=1)
         elif self.loss == 'smn':
             if not is_eval:
                 x = self.after_speaker_embedding(x, target=target), x
-
-
         return x
 
     def context_size(self):
+        """
+        Return the size of the input context required
+
+        :return: the size of the context, unit is the number of feature frames
+        """
         context = 1
         if isinstance(self, Xtractor):
             for name, module in self.sequence_network.named_modules():
@@ -830,13 +924,12 @@ class Xtractor(torch.nn.Module):
         return context
 
 
-def fill_dict(target_dict, source_dict, prefix = ""):
+def fill_dict(target_dict, source_dict, prefix=""):
     """
     Recursively Fill a dictionary target_dict by taking values from source_dict
 
     :param target_dict: output dictionary that is initialized with default values
     :param source_dict: input dictionary
-    :return:
     """
     for k1, v1 in target_dict.items():
 
@@ -857,12 +950,14 @@ def update_training_dictionary(dataset_description,
                                training_description,
                                kwargs=None):
     """
+    Fill the training dictionary with the input configuration
 
-    :param dataset_description:
-    :param model_description:
-    :param training_description:
-    :param kwargs:
-    :return:
+    :param dataset_description: configuration dictionary that describes the training dataset (or a YAML file name)
+    :param model_description: configuration dictionary that describes the system architecture (or a YAML file name)
+    :param training_description: configuration dictionary that describes the training process (or a YAML file name)
+    :param kwargs: arguments
+
+    :return: the three dictionaries after updating their content
     """
     dataset_opts=dict()
     model_opts=dict()
@@ -986,6 +1081,8 @@ def update_training_dictionary(dataset_description,
     fill_dict(model_opts, tmp_model_dict)
     fill_dict(training_opts, tmp_train_dict)
 
+    print(model_opts)
+
     # Overwrite with manually given parameters
     if "lr" in kwargs:
         training_opts["lr"] = kwargs['lr']
@@ -1005,76 +1102,63 @@ def update_training_dictionary(dataset_description,
 
 def get_network(model_opts, local_rank):
     """
+    Initialize the neural network following the description given in a configuration dictionary
 
-    :param model_opts:
-    :param local_rank:
-    :return:
+    :param model_opts: the dictionary describing the network architecture
+    :param local_rank: rank of the device if parallel processing is active
+
+    :return: the neural network
     """
 
-    if model_opts["model_type"] in ["xvector", "rawnet2", "resnet34", "fastresnet34", "halfresnet34"]:
+    if model_opts["model_type"] in ["xvector", "rawnet2", "resnet34", "fastresnet34", "halfresnet34", "wavlmecapa"]:
         model = Xtractor(model_opts["speaker_number"], model_opts["model_type"], loss=model_opts["loss"]["type"], embedding_size=model_opts["embedding_size"])
     else:
         # Custom type of model
         model = Xtractor(model_opts["speaker_number"], model_opts, loss=model_opts["loss"]["type"], embedding_size=model_opts["embedding_size"])
 
     # Load the model if it exists
-    if model_opts["initial_model_name"] is not None and os.path.isfile(model_opts["initial_model_name"]):
-        logging.critical(f"*** Load model from = {model_opts['initial_model_name']}")
-        checkpoint = torch.load(model_opts["initial_model_name"])
+    if model_opts["initial_model_name"] is not None:
+        if os.path.isfile(model_opts["initial_model_name"]):
+            logging.critical(f"*** Load model from = {model_opts['initial_model_name']}")
+            checkpoint = torch.load(model_opts["initial_model_name"], map_location={"cuda:0" : "cuda:%d" % local_rank})
 
-        """
-        Here we remove all layers that we don't want to reload
+            """
+            Here we remove all layers that we don't want to reload
 
-        """
-        pretrained_dict = checkpoint["model_state_dict"]
-        for part in model_opts["reset_parts"]:
-            pretrained_dict = {k: v for k, v in pretrained_dict.items() if not k.startswith(part)}
+            """
+            pretrained_dict = checkpoint["model_state_dict"]
+            for part in model_opts["reset_parts"]:
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if not k.startswith(part)}
 
-        new_model_dict = model.state_dict()
-        new_model_dict.update(pretrained_dict)
-        model.load_state_dict(new_model_dict)
+            new_model_dict = model.state_dict()
+            new_model_dict.update(pretrained_dict)
+            model.load_state_dict(new_model_dict)
 
-        # Freeze required layers
-        for name, param in model.named_parameters():
-            if name.split(".")[0] in model_opts["reset_parts"]:
-                param.requires_grad = False
+            # Freeze required layers
+            for name, param in model.named_parameters():
+                if name.split(".")[0] in model_opts["reset_parts"]:
+                    param.requires_grad = False
 
-    if model_opts["loss"]["type"] == "aam" and not (model_opts["loss"]["aam_margin"] == 0.2 and model_opts["loss"]["aam_s"] == 30):
-        model.after_speaker_embedding.change_params(model_opts["loss"]["aam_s"], model_opts["loss"]["aam_margin"])
-        print(f"Modified AAM: margin = {model.after_speaker_embedding.m} and s = {model.after_speaker_embedding.s}")
-
-    if local_rank < 1:
-        
-
-        logging.info(model)
-        logging.info("Model_parameters_count: {:d}".format(
-            sum(p.numel()
-                for p in model.sequence_network.parameters()
-                if p.requires_grad) + \
-            sum(p.numel()
-                for p in model.before_speaker_embedding.parameters()
-                if p.requires_grad) + \
-            sum(p.numel()
-                for p in model.stat_pooling.parameters()
-                if p.requires_grad)))
+    #if model_opts["loss"]["type"] == "aam" and not (model_opts["loss"]["aam_margin"] == 0.2 and model_opts["loss"]["aam_s"] == 30):
+    #    model.after_speaker_embedding.change_params(model_opts["loss"]["aam_s"], model_opts["loss"]["aam_margin"])
+    #    print(f"Modified AAM: margin = {model.after_speaker_embedding.m} and s = {model.after_speaker_embedding.s}")
 
     return model
 
 
 def get_loaders(dataset_opts, training_opts, model_opts, local_rank=0):
     """
-
-    :param dataset_opts:
-    :param training_opts:
-    :param model_opts:
-    :return:
-    """
-
-    """
-    Set the dataloaders according to the dataset_yaml
-    
+    Initialize the dataloader object required for training and validation
     First we load the dataframe from CSV file in order to split it for training and validation purpose
     Then we provide those two
+
+    :param dataset_opts: dictionary describing the dataset options for training and validation
+    :param training_opts: dictionary that decribes the training process
+    :param model_opts: dictionary that describes the model architecture
+    :param local_rank: index of the current device (default is 0)
+
+    :return: the data loader for training, the dataloader for validation, the sampler for training
+     indices of the target trials and impostor trials
     """
     df = pandas.read_csv(dataset_opts["dataset_csv"])
 
@@ -1084,39 +1168,24 @@ def get_loaders(dataset_opts, training_opts, model_opts, local_rank=0):
     training_df, validation_df = train_test_split(df,
                                                   test_size=dataset_opts["validation_ratio"],
                                                   stratify=stratify)
-
+    
+    # TODO
     torch.manual_seed(training_opts['torch_seed'] + local_rank)
     torch.cuda.manual_seed(training_opts['torch_seed'] + local_rank)
 
-    train_DEV4S = "/tmp/DEV4S_train_side_set.pl"
-    val_DEV4S = "/tmp/DEV4S_val_side_set.pl"
-    if os.environ.get('DEV4S') == 'True':
-        dataset_opts["batch_size"] = 4
-    if os.environ.get('DEV4S') == 'True' and os.path.isfile(train_DEV4S) and os.environ.get('DEV4S_KeepDataPrep') != "True":
-        with open(train_DEV4S, "rb") as f:
-            training_set = pickle.load(f)
-        with open(val_DEV4S, "rb") as f:
-            validation_set = pickle.load(f)
-    else:
-        training_set = SideSet(dataset_opts,
-                               set_type="train",
-                               chunk_per_segment=-1,
-                               transform_number=dataset_opts['train']['transform_number'],
-                               overlap=dataset_opts['train']['overlap'],
-                               dataset_df=training_df,
-                               output_format="pytorch",
-                               )
+    training_set = SideSet(dataset_opts,
+                           set_type="train",
+                           chunk_per_segment=-1,
+                           transform_number=dataset_opts['train']['transform_number'],
+                           overlap=dataset_opts['train']['overlap'],
+                           dataset_df=training_df,
+                           output_format="pytorch"
+                           )
 
-        validation_set = SideSet(dataset_opts,
-                                 set_type="validation",
-                                 dataset_df=validation_df,
-                                 output_format="pytorch")
-
-    if os.environ.get('DEV4S') == 'True' and not os.path.isfile(train_DEV4S):
-        with open(train_DEV4S, "wb") as f:
-            pickle.dump(training_set, f)
-        with open(val_DEV4S, "wb") as f:
-            pickle.dump(validation_set, f)
+    validation_set = SideSet(dataset_opts,
+                             set_type="validation",
+                             dataset_df=validation_df,
+                             output_format="pytorch")
 
     if model_opts["loss"]["type"] == 'aps':
         samples_per_speaker = 2
@@ -1124,22 +1193,22 @@ def get_loaders(dataset_opts, training_opts, model_opts, local_rank=0):
         samples_per_speaker = 1
 
     if training_opts["multi_gpu"]:
-        assert dataset_opts["batch_size"] % int(os.environ['WORLD_SIZE']) == 0
+        assert dataset_opts["batch_size"] % torch.cuda.device_count() == 0
         assert dataset_opts["batch_size"] % samples_per_speaker == 0
-        batch_size = dataset_opts["batch_size"]//(int(os.environ['WORLD_SIZE']) * dataset_opts["train"]["sampler"]["examples_per_speaker"])
+        batch_size = dataset_opts["batch_size"]//torch.cuda.device_count()
 
         side_sampler = SideSampler(data_source=training_set.sessions['speaker_idx'],
                                    spk_count=model_opts["speaker_number"],
                                    examples_per_speaker=dataset_opts["train"]["sampler"]["examples_per_speaker"],
                                    samples_per_speaker=dataset_opts["train"]["sampler"]["samples_per_speaker"],
-                                   batch_size=batch_size,
+                                   batch_size=batch_size*torch.cuda.device_count(),
                                    seed=training_opts['torch_seed'],
                                    rank=local_rank,
-                                   num_process=int(os.environ['WORLD_SIZE']),
+                                   num_process=torch.cuda.device_count(),
                                    num_replicas=dataset_opts["train"]["sampler"]["augmentation_replica"]
                                    )
     else:
-        batch_size = dataset_opts["batch_size"] // dataset_opts["train"]["sampler"]["examples_per_speaker"]
+        batch_size = dataset_opts["batch_size"]
         side_sampler = SideSampler(data_source=training_set.sessions['speaker_idx'],
                                    spk_count=model_opts["speaker_number"],
                                    examples_per_speaker=dataset_opts["train"]["sampler"]["examples_per_speaker"],
@@ -1147,7 +1216,7 @@ def get_loaders(dataset_opts, training_opts, model_opts, local_rank=0):
                                    batch_size=batch_size,
                                    seed=training_opts['torch_seed'],
                                    rank=0,
-                                   num_process=1,
+                                   num_process=torch.cuda.device_count(),
                                    num_replicas=dataset_opts["train"]["sampler"]["augmentation_replica"]
                                    )
 
@@ -1184,11 +1253,12 @@ def get_loaders(dataset_opts, training_opts, model_opts, local_rank=0):
 
 def get_optimizer(model, model_opts, train_opts, training_loader):
     """
+    Initialize the optimizer and scheduler
 
-    :param model:
-    :param model_opts:
-    :param train_opts:
-    :param training_loader:
+    :param model: the neural network
+    :param model_opts: dictionary describing the model architecture
+    :param train_opts: dictionary describing the training parameters
+    :param training_loader: dataloader for training
     :return:
     """
     if train_opts["optimizer"]["type"] == 'adam':
@@ -1244,18 +1314,18 @@ def get_optimizer(model, model_opts, train_opts, training_loader):
 
     elif train_opts["scheduler"]["type"] == "MultiStepLR":
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer,
-                                                         milestones=[10000,50000,100000],
+                                                         milestones=[10000, 50000, 100000],
                                                          gamma=0.5)
 
     elif train_opts["scheduler"]["type"] == "StepLR":
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,
-                                                           step_size=0.5 * training_loader.__len__(),
-                                                           gamma=0.95)
+                                                    step_size=1 * training_loader.__len__(),
+                                                    gamma=0.95)
 
     elif train_opts["scheduler"]["type"] == "StepLR2":
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,
-                                                           step_size=1 * training_loader.__len__(),
-                                                           gamma=0.5)
+                                                    step_size=1 * training_loader.__len__(),
+                                                    gamma=0.5)
     else:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                                mode='min',
@@ -1268,14 +1338,14 @@ def get_optimizer(model, model_opts, train_opts, training_loader):
 
 def save_model(model, training_monitor, model_opts, training_opts, optimizer, scheduler):
     """
+    Save the neural network to disk
 
-    :param model:
-    :param training_monitor:
-    :param model_opts:
-    :param training_opts:
-    :param optimizer:
-    :param scheduler:
-    :return:
+    :param model: the neural network to save
+    :param training_monitor: a training monitor object
+    :param model_opts: dictionary describing the model architecture
+    :param training_opts: dictionary describing the training process
+    :param optimizer: optimizer object
+    :param scheduler: scehduler object to restart from
     """
 
     best_name = training_opts["best_model_name"]
@@ -1308,7 +1378,7 @@ def save_model(model, training_monitor, model_opts, training_opts, optimizer, sc
         }, training_monitor.is_best, filename=tmp_name, best_filename=best_name)
 
 
-class AAMScheduler():
+class AAMScheduler:
     """
     For now we only update margin
     """
@@ -1352,26 +1422,28 @@ def xtrain(dataset_description,
            training_description,
            **kwargs):
     """
-    REFACTORING
-    - en cas de redemarrage à partir d'un modele existant, recharger l'optimize et le scheduler
+    Train an x-vector extractor
+
+    :param dataset_description: dictionary describing the training and validation datasets or the name of
+    the YAML to load it from
+    :param model_description: dictionary describing the model architecture  or the name of
+    the YAML to load it from
+    :param training_description: dictionary describing the training process or the name of the YAML file to load it from
+
+    :return: the training monitor summarizing the training of the network
     """
-
-    torch.multiprocessing.set_start_method('forkserver', force=True)
-
     local_rank = -1
     if "RANK" in os.environ:
         local_rank = int(os.environ['RANK'])
 
     # Test to optimize
-    #  torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = True
     torch.autograd.profiler.emit_nvtx(enabled=False)
 
     dataset_opts, model_opts, training_opts = update_training_dictionary(dataset_description,
                                                                          model_description,
                                                                          training_description,
                                                                          kwargs)
-    if os.environ.get('DEV4S') == 'True':
-        training_opts["multi_gpu"] = False
 
     # Initialize the training monitor
     monitor = TrainingMonitor(output_file=training_opts["log_file"],
@@ -1403,8 +1475,18 @@ def xtrain(dataset_description,
 
     # Initialize the model
     model = get_network(model_opts, local_rank)
-    if local_rank < 1:
+    if local_rank < 1:        
         monitor.logger.info(model)
+        monitor.logger.info("Model_parameters_count: {:d}".format(
+            sum(p.numel()
+                for p in model.sequence_network.parameters()
+                if p.requires_grad) + \
+            sum(p.numel()
+                for p in model.before_speaker_embedding.parameters()
+                if p.requires_grad) + \
+            sum(p.numel()
+                for p in model.stat_pooling.parameters()
+                if p.requires_grad)))
 
     embedding_size = model.embedding_size
     aam_scheduler = None
@@ -1446,7 +1528,7 @@ def xtrain(dataset_description,
     """
     if training_opts["multi_gpu"]:
         if local_rank < 1:
-            print("Let's use", int(os.environ['WORLD_SIZE']), "GPUs!")
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
         torch.distributed.init_process_group(backend='nccl', init_method='env://')
         model = torch.nn.parallel.DistributedDataParallel(model,
                                                           device_ids=[local_rank],
@@ -1463,7 +1545,7 @@ def xtrain(dataset_description,
 
     if local_rank < 1:
         monitor.logger.info(f"Start training process")
-        monitor.logger.info(f"Use \t{int(os.environ['WORLD_SIZE'])} \tgpus")
+        monitor.logger.info(f"Use \t{torch.cuda.device_count()} \tgpus")
         monitor.logger.info(f"Use \t{training_opts['num_cpu']} \tcpus")
 
         monitor.logger.info(f"Validation EER will be measured using")
@@ -1511,10 +1593,12 @@ def xtrain(dataset_description,
                                                           training_opts["mixed_precision"])
 
             test_eer = None
+            norm_eer = None
             if training_opts["compute_test_eer"] and local_rank < 1:
-                test_eer = test_metrics(model, device, model_opts, dataset_opts, training_opts)
+                test_eer, norm_eer = test_metrics(model, device, model_opts, dataset_opts, training_opts)
 
             monitor.update(test_eer=test_eer,
+                           norm_eer=norm_eer,
                            val_eer=val_eer,
                            val_loss=val_loss,
                            val_acc=val_acc)
@@ -1523,15 +1607,14 @@ def xtrain(dataset_description,
                 monitor.display()
 
             # Save the current model and if needed update the best one
-            # TODO ajouter une option qui garde les modèles à certaines époques (par exemple avant le changement de LR
+            # TODO add an option to save the model after certain epochs (for instance before the LR modification)
             if local_rank < 1:
-                save_model(model, monitor, model_opts, training_opts, optimizer, scheduler)
+                save_model(model, monitor, model_opts, training_opts, optimizer, scheduler, epoch)
 
-
-    for ii in range(int(os.environ['WORLD_SIZE'])):
+    for ii in range(torch.cuda.device_count()):
         monitor.logger.info(torch.cuda.memory_summary(ii))
 
-    # TODO gérer l'affichage en utilisant le training_monitor
+    # TODO manage display using Training Monitor
     if local_rank < 1:
         monitor.display_final()
 
@@ -1549,18 +1632,20 @@ def train_epoch(model,
                 clipping=False,
                 aam_scheduler=None):
     """
+    Perform one epoch of training
 
-    :param model:
-    :param training_opts:
-    :param training_monitor:
-    :param training_loader:
-    :param optimizer:
-    :param scheduler:
-    :param device:
-    :param scaler:
-    :param clipping:
-    :param aam_scheduler:
-    :return:
+    :param model: the Xtractor object to train
+    :param training_opts: dictionary that describes the training process
+    :param training_monitor: a training monitor object
+    :param training_loader: the dataloader for training
+    :param optimizer: an optimizer object
+    :param scheduler: a scheduler object
+    :param device: the device to train on
+    :param scaler: boolean, if true use torch.cuda.amp.autocast
+    :param clipping: boolean, if true, use gradient clipping
+    :param aam_scheduler: an AAM_Scheduler object to modify the AAM parameters along training
+
+    :return: the Xtractor neural network avec the epoch
     """
     model.train()
     criterion = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -1586,13 +1671,17 @@ def train_epoch(model,
                     output_tuple, _ = model(data, target=target)
                     output, no_margin_output = output_tuple
                     loss = criterion(output, target)
+                elif loss_criteria == "circle":
+                    output_tuple, _ = model(data, target=target)
+                    output, no_margin_output = output_tuple
+                    loss = criterion(output, target)
                 elif loss_criteria == 'smn':
                     output_tuple, _ = model(data, target=target)
                     loss, output = output_tuple
                     loss += criterion(output, target)
                 elif loss_criteria == 'aps':
                     output_tuple, _ = model(data, target=target)
-                    loss, output = output_tuple
+                    loss, no_margin_output = output_tuple
                 else:
                     output, _ = model(data, target=None)
                     loss = criterion(output, target)
@@ -1626,17 +1715,15 @@ def train_epoch(model,
         if math.fmod(batch_idx, training_opts["log_interval"]) == 0:
             batch_size = target.shape[0]
             training_monitor.update(training_loss=loss.item(),
-                                    training_acc=100.0 * accuracy.item() / ((batch_idx + 1) * batch_size))
+                                    training_acc=100.0 * accuracy / ((batch_idx + 1) * batch_size))
 
-            training_monitor.logger.info('Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: {:.3f}\tLr: {}'.format(
+            training_monitor.logger.info('Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: {:.3f}'.format(
                 training_monitor.current_epoch,
                 batch_idx + 1,
                 training_loader.__len__(),
                 100. * batch_idx / training_loader.__len__(),
                 running_loss / batch_count,
-                100.0 * accuracy / (batch_count*target.shape[0]),
-                scheduler.get_last_lr()[0], # TODO only working fro some scheduler
-            ))
+                100.0 * accuracy / (batch_count*target.shape[0])))
             running_loss = 0.0
             accuracy = 0.0
             batch_count = 0
@@ -1649,14 +1736,17 @@ def train_epoch(model,
             model.after_speaker_embedding.margin = aam_scheduler.__step__()
     return model
 
+
 def cross_validation(model, validation_loader, device, validation_shape, tar_indices, non_indices, mixed_precision=False):
     """
+    Perform cross-validation during the training process
 
-    :param model:
-    :param validation_loader:
-    :param device:
-    :param validation_shape:
-    :return:
+    :param model: the Xtractor object to evaluate
+    :param validation_loader: dataloader object for validation
+    :param device: device to compute on
+    :param validation_shape: shape of the validation embedding tensor, used to compute EER
+
+    :return: a tupple with accuracy, loss and EER
     """
     model.eval()
     if isinstance(model, Xtractor):
@@ -1718,22 +1808,25 @@ def extract_embeddings(idmap_name,
                        mixed_precision=False,
                        norm_embeddings=True):
     """
+    Extract embeddings using an Xtractor model.
 
-    :param idmap_name:
-    :param model_filename:
-    :param data_root_name:
-    :param device:
-    :param file_extension:
-    :param transform_pipeline:
-    :param sliding_window:
-    :param win_duration:
-    :param win_shift:
-    :param num_thread:
-    :param sample_rate:
-    :param mixed_precision:
-    :return:
+    :param idmap_name: the IdMap object including the list of segments to extract embeddings on
+    :param model_filename: the name of the file containing the Xtractor object
+    :param data_root_name: path to the data directory
+    :param device: device to compute on
+    :param batch_size: size of the batch to process
+    :param file_extension: extension of the audio files to read from
+    :param transform_pipeline: transformation pipeline in a dictionary (default is an empty dictionary)
+    :param sliding_window: boolean, if true, extract embeddings on a  sliding window
+    :param win_duration: duration of the sliding window if needed (default is 3 seconds)
+    :param win_shift: shift between two consecutive windows (default is 1.5 seconds)
+    :param num_thread: number of processes for the dataloader (default is 1)
+    :param sample_rate: sample rate of the input audio signal (default is 16000Hz)
+    :param mixed_precision: boolean, if True use mixed precision (default is False)
+    :param norm_embeddings: boolean, if True normlize embeddings, default is True)
+
+    :return: a StatServer object with the embeddings
     """
-
     if sliding_window:
         batch_size = 1
 
@@ -1784,6 +1877,7 @@ def extract_embeddings(idmap_name,
         modelset= []
         segset = []
         starts = []
+        stops = []
 
         for idx, (data, mod, seg, start, stop) in enumerate(tqdm.tqdm(dataloader,
                                                                       desc='xvector extraction',
@@ -1803,15 +1897,20 @@ def extract_embeddings(idmap_name,
                 if sliding_window:
                     tmp_start = numpy.arange(0, data.shape[0] * win_shift, win_shift)
                     starts.extend(tmp_start * sample_rate + start.detach().cpu().numpy())
+                    win_duration = int(len(tmp_data))
                 else:
                     starts.append(start.numpy())
+                    stops.append(tmp_data[0].shape[1])
 
         embeddings = StatServer()
         embeddings.stat1 = numpy.concatenate(embed)
         embeddings.modelset = numpy.array(modelset).astype('>U')
         embeddings.segset = numpy.array(segset).astype('>U')
         embeddings.start = numpy.array(starts).squeeze()
-        embeddings.stop = embeddings.start + win_duration
+        if sliding_window:
+            embeddings.stop = embeddings.start + win_duration
+        else:
+            embeddings.stop = embeddings.start + numpy.array(stops).squeeze()
         embeddings.stat0 = numpy.ones((embeddings.modelset.shape[0], 1))
 
     return embeddings
@@ -1827,17 +1926,19 @@ def extract_embeddings_per_speaker(idmap_name,
                                    mixed_precision=False,
                                    num_thread=1):
     """
+    Extract embeddings per speaker by concatenating all data from each speaker.
 
-    :param idmap_name:
-    :param model_filename:
-    :param data_root_name:
-    :param device:
-    :param file_extension:
-    :param transform_pipeline:
-    :param sample_rate:
-    :param mixed_precision:
-    :param num_thread:
-    :return:
+    :param idmap_name: the IdMap object including the list of segments to extract embeddings on
+    :param model_filename: name of the file from where to load the model
+    :param data_root_name: path to the data directory
+    :param device: device to compute on
+    :param file_extension: extension of the audio files to read from
+    :param transform_pipeline: transformation pipeline in a dictionary (default is an empty dictionary)
+    :param sample_rate: sample rate of the input audio signal (default is 16000Hz)
+    :param mixed_precision: boolean, if True use mixed precision (default is False)
+    :param norm_embeddings: boolean, if True normlize embeddings, default is True)
+
+    :return: a StatServer object with the embeddings
     """
     # Load the model
     if isinstance(model_filename, str):
