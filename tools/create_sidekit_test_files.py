@@ -75,11 +75,7 @@ def main():
         non.append(np.array(new_non))
         tar.append(np.array(new_tar))
 
-    key = Key()
-    key.modelset = np.array(modelset)
-    key.segset = np.array(segset)
-    key.tar = np.array(tar)
-    key.non = np.array(non)
+    key = Key.create(np.array(modelset), np.array(segset), np.array(tar), np.array(non))
 
     # Ndx from Idmap
     ndxData = key.to_ndx()
