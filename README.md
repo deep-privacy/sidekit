@@ -6,6 +6,10 @@ This repo provides the python/pytorch implementation the Deep Neural Network bas
 
 Authors: Anthony Larcher & Kong Aik Lee & Sylvain Meignier
 
+---
+⚠️ For further release go to: https://git-lium.univ-lemans.fr/speaker/sidekit
+---
+
 ## Installation
 
 ```sh
